@@ -6,7 +6,7 @@ license = "Apache-2.0 OR MPL-2.0"
 readme = "README.md"
 authors = ["Menhera.org Developers"]
 repository = "https://github.com/menhera-org/mirams"
-description = "Menhera.org Internet Resources Assignment Management System"
+description = "Menhera.org Internet Resources Assignment Management System (proc-macros)"
 homepage = "https://github.com/menhera-org/mirams"
 
 [lib]
