@@ -25,7 +25,6 @@ dioxus-cli = "0.5"
 dioxus-cli-config = "0.5"
 
 [workspace]
-
 members = [
     "frontend", "proc-macros",
 ]

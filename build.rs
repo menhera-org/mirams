@@ -8,6 +8,13 @@ fn main () {
     println!("cargo:rerun-if-changed=frontend");
     let root_crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let bin = root_crate_dir.join("frontend");
+
+    // If the frontend directory doesn't exist, we don't need to build it
+    // (possibly true for Crates.io uploaded version)
+    if !bin.join("Cargo.toml").exists() {
+        return;
+    }
+
     let _config = DioxusConfig::load(Some(bin.clone())).unwrap().unwrap_or(DioxusConfig::default());
     let opts = cli::cfg::ConfigOptsBuild {
         release: true,

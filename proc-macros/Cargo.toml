@@ -2,6 +2,12 @@
 name = "mirams-proc-macros"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0 OR MPL-2.0"
+readme = "README.md"
+authors = ["Menhera.org Developers"]
+repository = "https://github.com/menhera-org/mirams"
+description = "Menhera.org Internet Resources Assignment Management System"
+homepage = "https://github.com/menhera-org/mirams"
 
 [lib]
 proc-macro = true

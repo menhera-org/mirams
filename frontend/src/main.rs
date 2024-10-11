@@ -20,6 +20,10 @@ fn main() {
 
 fn App() -> Element {
     rsx! {
+        link {
+            rel: "icon",
+            href: "/icon.svg",
+        }
         Router::<Route> {}
     }
 }
