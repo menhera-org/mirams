@@ -1,6 +1,5 @@
 /target
 .env
 *.log
-/Cargo.lock
 /frontend-dist
 
