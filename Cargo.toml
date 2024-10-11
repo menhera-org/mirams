@@ -18,7 +18,7 @@ r2d2 = "^0.8"
 r2d2_sqlite = { version = "0.25.0", features = ["bundled"] }
 argon2 = "0.5"
 hex = "0.4.3"
-mirams-proc-macros = { workspace = true }
+mirams-proc-macros = { workspace = true, version = "0.1.0" }
 
 [build-dependencies]
 dioxus-cli = "0.5"
