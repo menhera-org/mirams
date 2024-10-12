@@ -3,6 +3,7 @@ pub mod store;
 pub mod db_sqlite;
 
 pub mod static_files;
+pub mod server;
 
 pub mod types;
 pub mod ipv6;
@@ -372,6 +373,9 @@ mod tests {
     fn static_files() {
         let files = static_files::frontend_files();
         assert!(files.len() > 0);
-        println!("{:?}", files);
+        for (path, _) in files {
+            assert!(path.len() > 0);
+            println!("{}", path);
+        }
     }
 }
