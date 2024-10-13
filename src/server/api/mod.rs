@@ -7,7 +7,7 @@ use super::Server;
 
 use axum::Router;
 use axum::body::Body;
-use axum::routing::get;
+use axum::routing::{get, post};
 
 use tower_http::auth::{AsyncRequireAuthorizationLayer, AsyncAuthorizeRequest};
 use http::{Request, Response, StatusCode, header::AUTHORIZATION, Method};
@@ -57,7 +57,7 @@ where
 {
     let mut router = Router::new();
 
-    router = router.route("/login", get(login::api_v1_login));
+    router = router.route("/login", post(login::api_v1_login));
 
     router = router.nest("/authenticated", build_authenticated_router(state.clone()));
 
