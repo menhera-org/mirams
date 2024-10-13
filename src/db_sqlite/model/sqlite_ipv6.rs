@@ -47,7 +47,7 @@ impl Ipv6AssignmentStore for SqliteIpv6AssignmentStore {
 
     fn get_spaces(&self) -> Result<Vec<crate::ipv6::AssignmentSpaceIpv6>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, space_visibility, ipv6_prefix, ipv6_prefix_len FROM assignment_space_ipv6")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, space_visibility, ipv6_prefix, ipv6_prefix_len FROM assignment_space_ipv6 ORDER BY ipv6_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![])?;
         let mut spaces = Vec::new();
         while let Some(row) = rows.next()? {
@@ -167,7 +167,7 @@ impl Ipv6AssignmentStore for SqliteIpv6AssignmentStore {
 
     fn get_pools(&self, space_id: i32) -> Result<Vec<crate::ipv6::AssignmentPoolIpv6>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, pool_visibility, ipv6_prefix, ipv6_prefix_len, assignment_space_id FROM assignment_pool_ipv6 WHERE assignment_space_id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, pool_visibility, ipv6_prefix, ipv6_prefix_len, assignment_space_id FROM assignment_pool_ipv6 WHERE assignment_space_id = ? ORDER BY ipv6_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![space_id])?;
         let mut pools = Vec::new();
         while let Some(row) = rows.next()? {
@@ -311,7 +311,7 @@ impl Ipv6AssignmentStore for SqliteIpv6AssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::ipv6::AssignmentIpv6>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, ipv6_prefix, ipv6_prefix_len, assignment_pool_id FROM assignment_ipv6 WHERE assignment_pool_id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, ipv6_prefix, ipv6_prefix_len, assignment_pool_id FROM assignment_ipv6 WHERE assignment_pool_id = ? ORDER BY ipv6_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![pool_id])?;
         let mut assignments = Vec::new();
         while let Some(row) = rows.next()? {

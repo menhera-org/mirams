@@ -35,4 +35,6 @@ pub trait UserStore {
     fn generate_api_key(&self, username: &str) -> Result<String, Error>;
 
     fn get_user_from_api_key(&self, api_key: &str) -> Result<Option<String>, Error>;
+
+    fn list_users(&self) -> Result<Vec<String>, Error>;
 }

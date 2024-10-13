@@ -47,7 +47,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_spaces(&self) -> Result<Vec<crate::asn::AssignmentSpaceAsn>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, space_visibility, asn_from, asn_to FROM assignment_space_asn")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, space_visibility, asn_from, asn_to FROM assignment_space_asn ORDER BY asn_from ASC")?;
         let rows = stmt.query_map(rusqlite::params![], |row| {
             Ok(crate::asn::AssignmentSpaceAsn {
                 id: row.get(0)?,
@@ -116,7 +116,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_pools(&self, space_id: i32) -> Result<Vec<crate::asn::AssignmentPoolAsn>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, pool_visibility, assignment_space_id, asn_from, asn_to FROM assignment_pool_asn WHERE assignment_space_id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, pool_visibility, assignment_space_id, asn_from, asn_to FROM assignment_pool_asn WHERE assignment_space_id = ? ORDER BY asn_from ASC")?;
         let rows = stmt.query_map(rusqlite::params![space_id], |row| {
             Ok(crate::asn::AssignmentPoolAsn {
                 id: row.get(0)?,
@@ -214,7 +214,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::asn::AssignmentAsn>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn WHERE assignment_pool_id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn WHERE assignment_pool_id = ? ORDER BY asn ASC")?;
         let rows = stmt.query_map(rusqlite::params![pool_id], |row| {
             Ok(crate::asn::AssignmentAsn {
                 id: row.get(0)?,

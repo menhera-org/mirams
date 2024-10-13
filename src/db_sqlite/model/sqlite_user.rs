@@ -143,6 +143,18 @@ impl SqliteUserStore {
         };
         Ok(username)
     }
+
+    pub fn list_users(&self) -> Result<Vec<String>, Error> {
+        let conn = self.db.get_conn()?;
+        let mut stmt = conn.prepare("SELECT name FROM user ORDER BY name ASC")?;
+        let mut rows = stmt.query(rusqlite::params![])?;
+        let mut users = Vec::new();
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(0)?;
+            users.push(name);
+        }
+        Ok(users)
+    }
 }
 
 impl UserStore for SqliteUserStore {
@@ -164,5 +176,9 @@ impl UserStore for SqliteUserStore {
 
     fn get_user_from_api_key(&self, api_key: &str) -> Result<Option<String>, Error> {
         SqliteUserStore::get_user_from_api_key(self, api_key)
+    }
+
+    fn list_users(&self) -> Result<Vec<String>, Error> {
+        SqliteUserStore::list_users(self)
     }
 }

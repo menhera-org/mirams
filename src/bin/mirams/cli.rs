@@ -49,4 +49,8 @@ pub(crate) enum Commands {
         #[arg(short, long)]
         username: String,
     },
+
+    /// List all users
+    #[command(name = "user-list")]
+    UserList,
 }

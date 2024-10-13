@@ -39,6 +39,7 @@ impl GlobalConfig {
             Commands::Server { listen_addr: _ } => server(self.clone()),
             Commands::UserSetPassword { username: _, password: _ } => user_set_password(self.clone()),
             Commands::UserDelete { username: _ } => user_delete(self.clone()),
+            Commands::UserList => user_list(self.clone()),
 
             #[allow(unreachable_patterns)]
             _ => unimplemented!(),
@@ -88,7 +89,7 @@ fn main() {
     }
 
     if let Some(path) = &db_path {
-        log::info!("Using database at {:?}", path);
+        log::debug!("Using database at {:?}", path);
     } else {
         log::info!("Using in-memory database. All data will be lost when the program exits.");
     }
@@ -151,6 +152,21 @@ fn user_delete(global_config: GlobalConfig) {
         Commands::UserDelete { username } => {
             let store = global_config.store();
             store.users().delete_user(username).unwrap();
+        },
+        _ => unreachable!(),
+    }
+}
+
+fn user_list(global_config: GlobalConfig) {
+    global_config.check_for_actual_db();
+
+    match &global_config.command {
+        Commands::UserList => {
+            let store = global_config.store();
+            let users = store.users().list_users().unwrap();
+            for user in users {
+                println!("{}", user);
+            }
         },
         _ => unreachable!(),
     }
