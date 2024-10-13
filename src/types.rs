@@ -1,4 +1,9 @@
 
+use serde::{
+    Serialize,
+    Deserialize,
+};
+
 use std::fmt::{
     Formatter,
     Display,
@@ -8,7 +13,8 @@ use std::any::Any;
 
 use std::error::Error as StdError;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 #[repr(i32)]
 pub enum ObjectVisibility {
     /// Child assignments visible to everyone

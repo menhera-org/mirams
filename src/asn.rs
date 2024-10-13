@@ -2,10 +2,13 @@
 use crate::types::Error;
 use crate::types::ObjectVisibility;
 
+use serde::{Serialize, Deserialize};
+
 
 /// ASN assignment space. Can contain multiple pools.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentSpaceAsn {
+    #[serde(default)]
     pub id: i32,
 
     /// Assignment Space name
@@ -25,8 +28,9 @@ pub struct AssignmentSpaceAsn {
 }
 
 /// ASN assignment pool. Can contain multiple assignments.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentPoolAsn {
+    #[serde(default)]
     pub id: i32,
 
     /// Parent assignment space ID
@@ -49,8 +53,9 @@ pub struct AssignmentPoolAsn {
 }
 
 /// ASN assignment to a specific entity.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentAsn {
+    #[serde(default)]
     pub id: i32,
 
     /// Parent assignment pool ID
@@ -61,6 +66,9 @@ pub struct AssignmentAsn {
 
     /// Document actual usage ratio, purpose, etc.
     pub description: String,
+
+    /// Assignment visibility
+    pub assignment_visibility: ObjectVisibility,
 
     /// Assigned ASN
     pub asn: u32,

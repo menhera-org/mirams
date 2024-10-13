@@ -286,7 +286,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
 
     fn get_assignment(&self, assignment_id: i32) -> Result<crate::ipv4::AssignmentIpv4, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id FROM assignment_ipv4 WHERE id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id, assignment_visibility FROM assignment_ipv4 WHERE id = ?")?;
         let mut rows = stmt.query(rusqlite::params![assignment_id])?;
         let row = rows.next()?;
         let assignment = match row {
@@ -298,6 +298,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
                     ipv4_prefix: row.get(3)?,
                     ipv4_prefix_len: row.get(4)?,
                     assignment_pool_id: row.get(5)?,
+                    assignment_visibility: row.get(6)?,
                 };
                 Some(assignment)
             },
@@ -313,7 +314,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::ipv4::AssignmentIpv4>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id FROM assignment_ipv4 WHERE assignment_pool_id = ? ORDER BY ipv4_prefix ASC")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id FROM assignment_ipv4, assignment_visibility WHERE assignment_pool_id = ? ORDER BY ipv4_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![pool_id])?;
         let mut assignments = Vec::new();
         while let Some(row) = rows.next()? {
@@ -324,6 +325,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
                 ipv4_prefix: row.get(3)?,
                 ipv4_prefix_len: row.get(4)?,
                 assignment_pool_id: row.get(5)?,
+                assignment_visibility: row.get(6)?,
             };
             assignments.push(assignment);
         }
@@ -400,11 +402,11 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
 
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO assignment_ipv4 (name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id) 
-                VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO assignment_ipv4 (name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id, assignment_visibility) 
+                VALUES (?, ?, ?, ?, ?, ?)"
             )?;
             stmt.execute(rusqlite::params![
-                assignment.name, assignment.description, assignment.ipv4_prefix, assignment.ipv4_prefix_len, assignment.assignment_pool_id
+                assignment.name, assignment.description, assignment.ipv4_prefix, assignment.ipv4_prefix_len, assignment.assignment_pool_id, assignment.assignment_visibility
             ])?;
         }
 

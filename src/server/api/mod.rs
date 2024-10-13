@@ -1,6 +1,7 @@
 
 mod v1_login;
 mod v1_user;
+mod v1_asn;
 
 use crate::store::DbConnection;
 
@@ -39,11 +40,37 @@ pub enum ApiResponseVariant {
     User(User),
     Users(Vec<User>),
     ApiToken(String),
+
+    AsnAssignmentSpace(crate::asn::AssignmentSpaceAsn),
+    AsnAssignmentPool(crate::asn::AssignmentPoolAsn),
+    AsnAssignment(crate::asn::AssignmentAsn),
+    Ipv4AssignmentSpace(crate::ipv4::AssignmentSpaceIpv4),
+    Ipv4AssignmentPool(crate::ipv4::AssignmentPoolIpv4),
+    Ipv4Assignment(crate::ipv4::AssignmentIpv4),
+    Ipv6AssignmentSpace(crate::ipv6::AssignmentSpaceIpv6),
+    Ipv6AssignmentPool(crate::ipv6::AssignmentPoolIpv6),
+    Ipv6Assignment(crate::ipv6::AssignmentIpv6),
+
+    AsnAssignmentSpaces(Vec<crate::asn::AssignmentSpaceAsn>),
+    AsnAssignmentPools(Vec<crate::asn::AssignmentPoolAsn>),
+    AsnAssignments(Vec<crate::asn::AssignmentAsn>),
+    Ipv4AssignmentSpaces(Vec<crate::ipv4::AssignmentSpaceIpv4>),
+    Ipv4AssignmentPools(Vec<crate::ipv4::AssignmentPoolIpv4>),
+    Ipv4Assignments(Vec<crate::ipv4::AssignmentIpv4>),
+    Ipv6AssignmentSpaces(Vec<crate::ipv6::AssignmentSpaceIpv6>),
+    Ipv6AssignmentPools(Vec<crate::ipv6::AssignmentPoolIpv6>),
+    Ipv6Assignments(Vec<crate::ipv6::AssignmentIpv6>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct User {
     pub username: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MetadataUpdateRequest {
+    pub name: String,
+    pub description: String,
 }
 
 pub fn build_json_response(response: ApiResponse, status: u16) -> Response<Body> {
@@ -65,11 +92,13 @@ where
 
     router = router.nest("/user", v1_user::build_router());
 
+    router = router.nest("/asn", v1_asn::build_router());
+
     // at the end, define the default route
     router = router.fallback(fallback_handler());
 
     let cors = cors::CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors::Any);
 
     let timeout = TimeoutLayer::new(Duration::from_secs(30));
@@ -200,4 +229,13 @@ where
     S: Clone + Send + Sync + 'static,
 {
     get(|| async { response_not_found() }).post(|| async { response_not_found() })
+}
+
+pub(crate) async fn run_blocking_task<T, F, R>(store: crate::store::Store<T>, f: F) -> R
+where
+    T: DbConnection + Clone + Send + Sync + 'static,
+    F: FnOnce(crate::store::Store<T>) -> R + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || f(store)).await.unwrap()
 }

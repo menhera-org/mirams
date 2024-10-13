@@ -2,6 +2,8 @@
 use crate::types::Error;
 use crate::types::ObjectVisibility;
 
+use serde::{Serialize, Deserialize};
+
 pub type RawIpv6Addr = [u8; 16];
 
 pub fn ipv6_subnet_mask(prefix_len: u8) -> RawIpv6Addr {
@@ -41,8 +43,9 @@ pub fn ipv6_broadcast_address(ip: RawIpv6Addr, prefix_len: u8) -> RawIpv6Addr {
 
 
 /// IPv6 assignment space. Can contain multiple pools.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentSpaceIpv6 {
+    #[serde(default)]
     pub id: i32,
 
     /// Assignment Space name
@@ -62,8 +65,9 @@ pub struct AssignmentSpaceIpv6 {
 }
 
 /// IPv6 assignment pool. Can contain multiple assignments.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentPoolIpv6 {
+    #[serde(default)]
     pub id: i32,
 
     /// Parent assignment space ID
@@ -86,8 +90,9 @@ pub struct AssignmentPoolIpv6 {
 }
 
 /// IPv6 assignment to a specific entity.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentIpv6 {
+    #[serde(default)]
     pub id: i32,
 
     /// Parent assignment pool ID
@@ -98,6 +103,9 @@ pub struct AssignmentIpv6 {
 
     /// Document actual usage ratio, purpose, etc.
     pub description: String,
+
+    /// Assignment visibility
+    pub assignment_visibility: ObjectVisibility,
 
     /// IPv6 prefix of the assignment, in big-endian bit and byte order
     pub ipv6_prefix: [u8; 16],

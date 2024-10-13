@@ -188,7 +188,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_assignment(&self, assignment_id: i32) -> Result<crate::asn::AssignmentAsn, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn WHERE id = ?")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn, assignment_visibility FROM assignment_asn WHERE id = ?")?;
         let mut rows = stmt.query(rusqlite::params![assignment_id])?;
         let row = rows.next()?;
         let assignment = match row {
@@ -199,6 +199,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
                     description: row.get(2)?,
                     assignment_pool_id: row.get(3)?,
                     asn: row.get(4)?,
+                    assignment_visibility: row.get(5)?,
                 };
                 Some(assignment)
             },
@@ -214,7 +215,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::asn::AssignmentAsn>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn WHERE assignment_pool_id = ? ORDER BY asn ASC")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn, assignment_visibility WHERE assignment_pool_id = ? ORDER BY asn ASC")?;
         let rows = stmt.query_map(rusqlite::params![pool_id], |row| {
             Ok(crate::asn::AssignmentAsn {
                 id: row.get(0)?,
@@ -222,6 +223,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
                 description: row.get(2)?,
                 assignment_pool_id: row.get(3)?,
                 asn: row.get(4)?,
+                assignment_visibility: row.get(5)?,
             })
         })?;
         let mut assignments = Vec::new();
@@ -259,8 +261,8 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
         {
             // Insert the new assignment
-            let mut insert_stmt = tx.prepare("INSERT INTO assignment_asn (name, description, assignment_pool_id, asn) VALUES (?, ?, ?, ?)")?;
-            insert_stmt.execute(rusqlite::params![assignment.name, assignment.description, assignment.assignment_pool_id, assignment.asn])?;
+            let mut insert_stmt = tx.prepare("INSERT INTO assignment_asn (name, description, assignment_pool_id, asn, assignment_visibility) VALUES (?, ?, ?, ?, ?)")?;
+            insert_stmt.execute(rusqlite::params![assignment.name, assignment.description, assignment.assignment_pool_id, assignment.asn, assignment.assignment_visibility])?;
         }
 
         tx.commit()?;

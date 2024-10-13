@@ -226,6 +226,7 @@ CREATE TABLE assignment_ipv4 (
     assignment_pool_id INTEGER NOT NULL,
     name BLOB NOT NULL,
     description BLOB NOT NULL,
+    assignment_visibility INTEGER NOT NULL,
     ipv4_prefix BLOB NOT NULL CHECK(length(ipv4_prefix) = 4),
     ipv4_prefix_len INTEGER NOT NULL CHECK(ipv4_prefix_len BETWEEN 0 AND 32),
     FOREIGN KEY (assignment_pool_id) REFERENCES assignment_pool_ipv4 (id) ON DELETE CASCADE
@@ -265,6 +266,7 @@ CREATE TABLE assignment_ipv6 (
     assignment_pool_id INTEGER NOT NULL,
     name BLOB NOT NULL,
     description BLOB NOT NULL,
+    assignment_visibility INTEGER NOT NULL,
     ipv6_prefix BLOB NOT NULL CHECK(length(ipv6_prefix) = 16),
     ipv6_prefix_len INTEGER NOT NULL CHECK(ipv6_prefix_len BETWEEN 0 AND 128),
     FOREIGN KEY (assignment_pool_id) REFERENCES assignment_pool_ipv6 (id) ON DELETE CASCADE
@@ -306,6 +308,7 @@ CREATE TABLE assignment_asn (
     assignment_pool_id INTEGER NOT NULL,
     name BLOB NOT NULL,
     description BLOB NOT NULL,
+    assignment_visibility INTEGER NOT NULL,
     asn UNSIGNED INTEGER NOT NULL,
     FOREIGN KEY (assignment_pool_id) REFERENCES assignment_pool_asn (id) ON DELETE CASCADE
 );

@@ -153,6 +153,7 @@ mod tests {
             assignment_pool_id: pool_id,
             name: "Test assignment".to_string(),
             description: "Description".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
             ipv4_prefix: Ipv4Addr::new(192, 168, 0, 1).octets(),
             ipv4_prefix_len: 32,
         };
@@ -266,6 +267,7 @@ mod tests {
             assignment_pool_id: pool_id,
             name: "Test assignment".to_string(),
             description: "Description".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
             ipv6_prefix: "2001:db8::1".parse::<Ipv6Addr>().unwrap().octets(),
             ipv6_prefix_len: 64,
         };
@@ -357,6 +359,7 @@ mod tests {
             assignment_pool_id: pool_id,
             name: "Test assignment".to_string(),
             description: "Description".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
             asn: 65000,
         };
         let assignment_id = asn_store.create_assignment(&assignment).unwrap();
