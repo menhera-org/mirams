@@ -7,10 +7,12 @@ use crate::store::Store;
 use crate::store::DbConnection;
 
 use axum::Router;
-use axum::response::Response;
 use axum::http::HeaderMap;
 use axum::body::Body;
 use axum::routing::get;
+use axum::extract::State as StateExtractor;
+
+use http::{Request, Response};
 
 use std::net::ToSocketAddrs;
 use std::path::Path;
@@ -42,13 +44,14 @@ where
         let addr = addr.to_socket_addrs().unwrap().next().unwrap();
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
-            rt.block_on(async {
+            rt.block_on(async move {
                 let mut app = build_frontend_router();
 
-                let api_router = api::build_api_v1_router(server.clone());
+                let api_router = api::build_api_v1_router();
                 app = app.nest("/api/v1", api_router);
 
-                let app = app.with_state(server.clone());
+                app = app.layer(axum::middleware::from_fn_with_state(server.clone(), add_state_extension::<Server<T>>));
+                let app = app.with_state(server);
 
                 let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
                 axum::serve(listener, app).await.unwrap();
@@ -119,4 +122,10 @@ where
     });
 
     router
+}
+
+async fn add_state_extension<S: Clone + Send + Sync + 'static>(StateExtractor(s): StateExtractor<S>, req: Request<Body>, next: axum::middleware::Next) -> Response<Body> {
+    let mut req = req;
+    req.extensions_mut().insert(s);
+    next.run(req).await
 }

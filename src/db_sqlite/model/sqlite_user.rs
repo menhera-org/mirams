@@ -109,6 +109,26 @@ impl SqliteUserStore {
         } else {
             return Err(Error::new(ErrorKind::NotFound,"User not found".to_string()));
         };
+
+        let api_key = {
+            let mut stmt = tx.prepare("SELECT key FROM api_key WHERE user_id = ?")?;
+            let mut rows = stmt.query(rusqlite::params![user.id])?;
+            let row = rows.next()?;
+            let api_key = match row {
+                Some(row) => {
+                    let api_key: String = row.get(0)?;
+                    Some(api_key)
+                },
+                None => None,
+            };
+            api_key
+        };
+
+        // TODO: Reusing API keys is not a good idea, but it's of a low priority to fix
+        if let Some(api_key) = api_key {
+            return Ok(api_key);
+        }
+
         let mut api_key = [0u8; 32];
         OsRng.fill_bytes(&mut api_key);
         let api_key = hex::encode(api_key);
