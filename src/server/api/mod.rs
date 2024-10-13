@@ -2,6 +2,8 @@
 mod v1_login;
 mod v1_user;
 mod v1_asn;
+mod v1_ipv4;
+mod v1_ipv6;
 
 use crate::store::DbConnection;
 
@@ -93,6 +95,10 @@ where
     router = router.nest("/user", v1_user::build_router());
 
     router = router.nest("/asn", v1_asn::build_router());
+
+    router = router.nest("/ipv4", v1_ipv4::build_router());
+
+    router = router.nest("/ipv6", v1_ipv6::build_router());
 
     // at the end, define the default route
     router = router.fallback(fallback_handler());
