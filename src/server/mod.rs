@@ -68,7 +68,21 @@ where
     let files = frontend_files();
     let types = types_by_ext();
 
+    let icon_path = crate::static_files::ICON_PATH;
+    let skip_favicon_ico = icon_path != "/favicon.ico";
+
     let mut router = Router::new();
+
+    if skip_favicon_ico {
+        router = router.route("/favicon.ico", get(move || async move {
+            Response::builder()
+                .status(301)
+                .header("Location", icon_path)
+                .body(Body::empty())
+                .unwrap()
+        }));
+    }
+
     for (path, content) in files {
         if path == "index.html" {
             continue;
@@ -81,6 +95,10 @@ where
         let br_content = files.get(&(path.to_string() + ".br")).map(|content| *content).map(|content| content.to_owned());
         let content_type = *types.get(&Path::new(path).extension().and_then(|ext| ext.to_str()).unwrap_or("")).unwrap_or(&"application/octet-stream");
         let content_type = content_type.to_owned();
+
+        if skip_favicon_ico && path == "favicon.ico" {
+            continue;
+        }
 
         router = router.route(&format!("/{}", path), get(move |headers: HeaderMap| async move {
             if headers.get("Accept-Encoding").and_then(|header| header.to_str().ok()).map(|header| header.contains("br")).unwrap_or(false) {

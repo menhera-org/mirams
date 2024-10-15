@@ -6,6 +6,9 @@ use std::path::Path;
 use std::sync::OnceLock;
 use std::collections::HashMap;
 
+/// If this is not "/favicon.ico", /favicon.ico will be redirected to this path.
+pub const ICON_PATH: &'static str = "/icon.svg";
+
 const CRATE_ROOT: &'static str = env!("CARGO_MANIFEST_DIR");
 const FRONTEND_FILES: &'static [(&'static str, &'static [u8])] = &generate_recursive_dir_content_list!("./frontend-dist");
 
