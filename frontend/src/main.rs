@@ -8,6 +8,8 @@ use dioxus_logger::tracing::{info, Level};
 
 use serde::{Deserialize, Serialize};
 
+pub const GITHUB_LINK: &str = "https://github.com/menhera-org/mirams";
+
 #[derive(Clone, Routable, Debug, PartialEq)]
 pub enum Route {
     #[layout(Wrapper)]
@@ -168,6 +170,14 @@ fn Home() -> Element {
             h1 { "MIRAMS" }
             p {
                 "MIRAMS: Menhera.org Internet Resources Assignment Management System"
+            }
+            ul {
+                li {
+                    Link {
+                        to: NavigationTarget::<Route>::External(GITHUB_LINK.to_string()),
+                        "GitHub"
+                    }
+                }
             }
         }
     }
