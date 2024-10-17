@@ -1,40 +1,350 @@
+/* -*- vim: ts=2 sw=2 et ai -*- */
+
+:root, * {
+  --theme-primary-text-color: #333;
+  --theme-secondary-text-color: #666;
+  --theme-disabled-text-color: #999;
+  --theme-main-background-color: #f5f5f5;
+  --theme-primary-background-color: #ffffff;
+  --theme-accent-color: #3B9EA3;
+  --theme-secondary-accent-color: #d1e7e8;
+  --theme-accent-text-color: #ffffff;
+  --theme-overlay-color: #00000080;
+
+  --drawer-width: 20rem;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 1;
+}
+
+:root, body, #main, #app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
-    background-color: #111216;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--theme-main-background-color);
+  color: var(--theme-primary-text-color);
 }
 
-#main {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif
+#app {
+  display: grid;
+  grid-template-rows: [app-start top-bar-start] 3rem [top-bar-end main-start] 1fr [main-end app-end];
+  transition: ease-in-out 0.2s grid-template-columns;
 }
 
-#links {
-    width: 400px;
-    text-align: left;
-    font-size: x-large;
-    color: white;
-    display: flex;
-    flex-direction: column;
+#app.app-drawer-closed {
+  grid-template-columns: [app-start main-start drawer-start] 0 [drawer-end] 1fr [main-end app-end];
 }
 
-#links a {
-    color: white;
-    text-decoration: none;
-    margin-top: 20px;
-    margin: 10px;
-    border: white 1px solid;
-    border-radius: 5px;
-    padding: 10px;
+#app.app-drawer-open {
+  grid-template-columns: [app-start main-start drawer-start] var(--drawer-width) [drawer-end] 1fr [main-end app-end];
 }
 
-#links a:hover {
-    background-color: #1f1f1f;
-    cursor: pointer;
+#app-top-bar {
+  grid-row: top-bar-start / top-bar-end;
+  grid-column: app-start / app-end;
+  background-color: var(--theme-accent-color);
+  color: var(--theme-accent-text-color);
+  display: flex;
+  align-items: center;
+  flex-direction: row;
 }
 
-#header {
-    max-width: 1200px;
+#app-top-bar-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  min-inline-size: 0;
+  overflow: hidden;
+}
+
+#app-top-bar-side {
+  inline-size: var(--drawer-width);
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  transition: inline-size 0.2s ease-in-out;
+}
+
+#app.app-drawer-closed #app-top-bar-side {
+  inline-size: 4rem;
+}
+
+#app-top-bar-branding {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  flex: 1;
+  transition: ease-in-out 0.2s opacity;
+  min-inline-size: 0;
+  opacity: 1;
+  overflow: hidden;
+}
+
+#app.app-drawer-closed #app-top-bar-branding {
+  opacity: 0;
+}
+
+#app-top-bar-navigation {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  block-size: 2.5rem;
+  margin-block-start: .5rem;
+  align-items: stretch;
+}
+
+.app-top-bar-navigation-start-edge, .app-top-bar-navigation-end-edge {
+  fill: var(--theme-secondary-accent-color);
+  flex-shrink: 0;
+}
+
+:dir(rtl) :is(.app-top-bar-navigation-start-edge, .app-top-bar-navigation-end-edge) {
+  transform: scaleX(-1);
+}
+
+.app-top-bar-navigation-content {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--theme-secondary-accent-color);
+  color: var(--theme-accent-color);
+}
+
+#app-overlay {
+  grid-row: app-start / app-end;
+  grid-column: drawer-end / main-end;
+  background-color: var(--theme-overlay-color);
+  opacity: 1;
+  transition: ease-in-out 0.2s opacity, ease-in-out 0.2s visibility;
+}
+
+#app.app-drawer-closed #app-overlay {
+  visibility: hidden;
+  opacity: 0;
+  transition: ease-in-out 0.2s opacity, ease-in-out 0s 0.2s visibility;
+}
+
+#app-drawer-navigation {
+  opacity: 1;
+  transition: ease-in-out 0.2s opacity, ease-in-out 0s 0.2s visibility;
+}
+
+#app.app-drawer-closed #app-drawer-navigation {
+  opacity: 0;
+}
+
+#app-main {
+  grid-row: main-start / main-end;
+  grid-column: main-start / main-end;
+  overflow: auto;
+}
+
+#app-drawer {
+  grid-row: main-start / main-end;
+  grid-column: drawer-start / drawer-end;
+  background-color: var(--theme-accent-color);
+  color: var(--theme-accent-text-color);
+  overflow: hidden;
+  opacity: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+#app.app-drawer-closed #app-drawer {
+  visibility: hidden;
+  transition: ease-in-out 0s 0.2s visibility;
+}
+
+#app-drawer > #app-drawer-shortcuts {
+  inline-size: 4rem;
+  min-inline-size: 0;
+  overflow-inline: hidden;
+  overflow-block: auto;
+}
+
+#app-drawer > #app-drawer-navigation {
+  background-color: var(--theme-secondary-accent-color);
+  color: var(--theme-accent-color);
+  flex: 1;
+  min-inline-size: 0;
+  overflow-inline: hidden;
+  overflow-block: auto;
+}
+
+#app-drawer > #app-drawer-navigation:dir(ltr) {
+  border-top-left-radius: 1rem;
+}
+
+#app-drawer > #app-drawer-navigation:dir(rtl) {
+  border-top-right-radius: 1rem;
+}
+
+@media (min-width: 40rem) {
+  #app-overlay {
+    display: none !important;
+  }
+
+  #app {
+    grid-template-columns: [app-start drawer-start] var(--drawer-width) [drawer-end main-start] 1fr [main-end app-end] !important;
+  }
+
+  #app-drawer {
+    visibility: visible !important;
+  }
+
+  #app-top-bar-side {
+    inline-size: var(--drawer-width) !important;
+  }
+
+  #app-top-bar-branding {
+    opacity: 1 !important;
+  }
+
+  .app-drawer-toggle-button {
+    visibility: hidden;
+  }
+
+  #app-drawer-navigation {
+    opacity: 1 !important;
+  }
+}
+
+.app-button {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  font-size: 1.5rem;
+  background-color: transparent;
+  color: inherit;
+  border: none;
+  inline-size: 3rem;
+  block-size: 3rem;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-button:hover {
+  opacity: .75;
+}
+
+.app-drawer-toggle-button {
+  inline-size: 4rem;
+}
+
+.link-button {
+  appearance: none;
+  text-decoration: none;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  display: block;
+  padding-inline: 2rem;
+  padding-block: .5rem;
+  opacity: .8;
+  cursor: default;
+}
+
+.link-button:hover {
+  opacity: .6;
+}
+
+.account-bar {
+  border-block-end: solid var(--theme-accent-text-color) 1px;
+  margin-block-end: .5rem;
+}
+
+.account-bar-username {
+  color: var(--theme-primary-text-color) !important;
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  padding-inline: 2rem;
+  padding-block: .5rem;
+}
+
+.account-bar-username > .material-symbols-outlined {
+  font-size: 2em;
+  display: block;
+  margin-inline-end: .5rem;
+}
+
+#app-main {
+  margin: .5rem;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  max-inline-size: 30rem;
+  margin-inline: auto;
+}
+
+.login-form > label {
+  padding: .5rem;
+  border: solid 1px var(--theme-secondary-text-color);
+  margin-block: .25rem;
+  display: flex;
+  flex-direction: row;
+  column-gap: .5rem;
+  background-color: var(--theme-primary-background-color);
+}
+
+.login-form > label:focus-within {
+  border-color: var(--theme-accent-color);
+}
+
+.login-form > label > input {
+  flex: 1;
+  padding: 0;
+  border: none;
+  outline: none !important;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  font: inherit;
+}
+
+.login-form-buttons {
+  text-align: center;
+}
+
+.login-form-login-button {
+  appearance: none;
+  border: none;
+  box-shadow: none;
+  padding-block: .5rem;
+  font-size: inherit;
+  padding-inline: 1rem;
+  color: var(--theme-accent-text-color);
+  background-color: var(--theme-accent-color);
+}
+
+.login-form-login-button:active {
+  opacity: .6;
+}
+
+.login-form-error {
+  color: #ff0000;
+  margin: 1rem;
+  background-color: #ffeeee;
 }
