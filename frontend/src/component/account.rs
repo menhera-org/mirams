@@ -23,9 +23,9 @@ pub fn LoginForm(props: LoginFormProps) -> Element {
     let mut password = use_signal(|| "".to_owned());
 
     rsx! {
-        h1 { "Login" }
         form {
             class: "login-form",
+            h1 { "Login" }
             label {
                 class: "login-form-username",
                 "Username",
