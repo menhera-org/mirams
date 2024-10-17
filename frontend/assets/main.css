@@ -261,7 +261,7 @@ body {
   padding-inline: 2rem;
   padding-block: .5rem;
   opacity: .8;
-  cursor: default;
+  cursor: pointer;
 }
 
 .link-button:hover {
