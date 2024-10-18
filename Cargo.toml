@@ -8,6 +8,9 @@ authors = ["Menhera.org Developers"]
 repository = "https://github.com/menhera-org/mirams"
 description = "Menhera.org Internet Resources Assignment Management System"
 homepage = "https://github.com/menhera-org/mirams"
+include = [
+    "/src", "/frontend-dist", "/LICENSE.*", "README.md", "/build.rs"
+]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
