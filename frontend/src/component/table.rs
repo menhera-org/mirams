@@ -43,6 +43,7 @@ pub fn AssignmentTable(mut rows: Vec<TableRow>) -> Element {
                 for row in rows {
                     tr {
                         class: if row.visibility == "Public" { "public" } else { "private" },
+                        title: row.visibility,
                         td {
                             div {
                                 class: "scrollable",
