@@ -360,6 +360,7 @@ fn AsnSpaceList() -> Element {
 #[component]
 fn AsnSpace(space_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -437,6 +438,42 @@ fn AsnSpace(space_id: i32) -> Element {
                     add_button_route: Route::AsnPoolAdd { space_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment space?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::AsnSpaceList {});
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Space"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -451,6 +488,7 @@ fn AsnSpace(space_id: i32) -> Element {
 #[component]
 fn AsnPool(space_id: i32, pool_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -548,6 +586,42 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
                     add_button_route: Route::AsnAssignmentAdd { space_id, pool_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment pool?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::AsnSpace { space_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Pool"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -562,6 +636,7 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
 #[component]
 fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -648,6 +723,42 @@ fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 h1 { "Assignment: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::AsnPool { space_id, pool_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -721,6 +832,7 @@ fn Ipv4SpaceList() -> Element {
 #[component]
 fn Ipv4Space(space_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -798,6 +910,42 @@ fn Ipv4Space(space_id: i32) -> Element {
                     add_button_route: Route::Ipv4PoolAdd { space_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment space?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv4SpaceList {});
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Space"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -812,6 +960,7 @@ fn Ipv4Space(space_id: i32) -> Element {
 #[component]
 fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -909,6 +1058,42 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
                     add_button_route: Route::Ipv4AssignmentAdd { space_id, pool_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment pool?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv4Space { space_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Pool"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -923,6 +1108,7 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
 #[component]
 fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -1009,6 +1195,42 @@ fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 h1 { "Assignment: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv4Pool { space_id, pool_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -1082,6 +1304,7 @@ fn Ipv6SpaceList() -> Element {
 #[component]
 fn Ipv6Space(space_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -1159,6 +1382,42 @@ fn Ipv6Space(space_id: i32) -> Element {
                     add_button_route: Route::Ipv6PoolAdd { space_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment space?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv6SpaceList {});
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Space"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -1173,6 +1432,7 @@ fn Ipv6Space(space_id: i32) -> Element {
 #[component]
 fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -1270,6 +1530,42 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
                     add_button_route: Route::Ipv6AssignmentAdd { space_id, pool_id },
                 }
                 component::table::AssignmentTable { rows: table_rows }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment pool?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv6Space { space_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment Pool"
+                        }
+                    }
+                }
             }
         }
         _ => {
@@ -1284,6 +1580,7 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
 #[component]
 fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
     let token = use_token();
+    let mut delete_popup_shown = use_signal(|| false);
     let future = use_resource(move || {
         let token = token.clone();
         async move {
@@ -1370,6 +1667,42 @@ fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 h1 { "Assignment: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                div {
+                    class: "delete-toolbar",
+                    if delete_popup_shown() {
+                        div {
+                            class: "delete-popup",
+                            p { "Are you sure you want to delete this assignment?" }
+                            button {
+                                class: "delete-button",
+                                onclick: move |_| {
+                                    let token = use_token();
+                                    spawn(async move {
+                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
+                                        let nav = use_context::<Navigator>();
+                                        nav.replace(Route::Ipv6Pool { space_id, pool_id });
+                                    });
+                                },
+                                "Yes"
+                            }
+                            button {
+                                class: "cancel-button",
+                                onclick: move |_| {
+                                    delete_popup_shown.set(false);
+                                },
+                                "No"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "delete-button",
+                            onclick: move |_| {
+                                delete_popup_shown.set(true);
+                            },
+                            "Delete Assignment"
+                        }
+                    }
+                }
             }
         }
         _ => {

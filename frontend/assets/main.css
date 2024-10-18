@@ -433,7 +433,7 @@ button:not(.link-button) {
   max-inline-size: max-content;
 }
 
-.app-signed-out .add-button-toolbar {
+.app-signed-out :is(.delete-toolbar, .add-button-toolbar) {
   display: none;
 }
 
@@ -462,4 +462,13 @@ label.select-label > select {
   padding-block: .5rem;
   max-inline-size: max-content;
   min-inline-size: 0;
+}
+
+.delete-popup {
+  display: flex;
+  flex-wrap: wrap;
+  max-inline-size: 100%;
+  flex-direction: row;
+  column-gap: 2rem;
+  align-items: center;
 }
