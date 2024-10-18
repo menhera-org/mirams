@@ -198,7 +198,7 @@ fn Login() -> Element {
             let username = attempt.username.clone();
 
 
-            let res: Result<LoginResult, _> = fetch::post("/api/v1/login", &attempt).await;
+            let res: Result<LoginResult, _> = fetch::post("/api/v1/login", &attempt, None).await;
             let res = match res {
                 Ok(res) => {
                 res
