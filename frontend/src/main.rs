@@ -172,6 +172,34 @@ fn Home() -> Element {
             p {
                 "MIRAMS: Menhera.org Internet Resources Assignment Management System"
             }
+            h2 { "Assignment Spaces" }
+            ul {
+                li {
+                    Link {
+                        to: Route::AsnSpaceList {},
+                        "ASN Assignment Spaces"
+                    }
+                }
+                li {
+                    Link {
+                        to: Route::Ipv4SpaceList {},
+                        "IPv4 Assignment Spaces"
+                    }
+                }
+                li {
+                    Link {
+                        to: Route::Ipv6SpaceList {},
+                        "IPv6 Assignment Spaces"
+                    }
+                }
+            }
+            h2 { "About MIRAMS" }
+            p {
+                "MIRAMS is a system for managing the assignment of Internet resources, such as ASNs, IPv4 and IPv6 address space."
+            }
+            p {
+                "MIRAMS is Free Software, and is available on GitHub."
+            }
             ul {
                 li {
                     Link {
