@@ -361,3 +361,11 @@ body {
 #app-main a:not(.link-button):is(:hover, :focus) {
   text-decoration: underline;
 }
+
+.drawer-footer {
+  margin-block-start: .5rem;
+  border-block-start: solid 1px var(--theme-accent-text-color);
+  padding-inline: 2rem;
+  padding-block: .5rem;
+  color: var(--theme-disabled-text-color);
+}

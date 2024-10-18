@@ -1,11 +1,12 @@
 #![allow(non_snake_case)]
 
-use dioxus::prelude::*;
-
 pub mod account;
 pub mod table;
 
 use crate::Route;
+
+use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Props)]
 pub struct DrawerProps {
@@ -18,6 +19,11 @@ pub struct DrawerState {
     pub open: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VersionResponse {
+    pub version: String,
+}
+
 #[component]
 pub fn Drawer(props: DrawerProps) -> Element {
     let user = use_context::<Signal<Option<account::User>>>();
@@ -25,6 +31,18 @@ pub fn Drawer(props: DrawerProps) -> Element {
     let nav = use_context::<Navigator>();
 
     let class = if drawer_open().open { "drawer drawer-open" } else { "drawer" };
+
+    let version_future = use_resource(|| {
+        async {
+            let res: Result<VersionResponse, _> = crate::fetch::get("/api/v1/version", None).await;
+            res
+        }
+    });
+
+    let version = match &*version_future.read_unchecked() {
+        Some(Ok(res)) => res.version.clone(),
+        _ => "unknown".to_string(),
+    };
 
     rsx! {
         div {
@@ -63,6 +81,10 @@ pub fn Drawer(props: DrawerProps) -> Element {
                     to: Route::Ipv6SpaceList {},
                     onclick: move |_| { crate::close_drawer(); },
                     "IPv6 Assignments",
+                }
+                div {
+                    class: "drawer-footer",
+                    p { "MIRAMS version: {version}" }
                 }
             }
         }
