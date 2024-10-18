@@ -68,7 +68,7 @@ pub mod example_data {
             name: "Example IPv4 pool".to_string(),
             description: "Example IPv4 pool".to_string(),
             pool_visibility: types::ObjectVisibility::Public,
-            ipv4_prefix: [192, 168, 0, 0],
+            ipv4_prefix: [192, 168, 1, 0],
             ipv4_prefix_len: 24,
         };
         let pool_id = ipv4_store.create_pool(&pool).unwrap();
@@ -78,7 +78,7 @@ pub mod example_data {
             name: "Example IPv4 assignment".to_string(),
             description: "Example IPv4 assignment".to_string(),
             assignment_visibility: types::ObjectVisibility::Public,
-            ipv4_prefix: [192, 168, 0, 1],
+            ipv4_prefix: [192, 168, 1, 1],
             ipv4_prefix_len: 32,
         };
         ipv4_store.create_assignment(&assignment).unwrap();
@@ -98,7 +98,7 @@ pub mod example_data {
             name: "Example IPv6 pool".to_string(),
             description: "Example IPv6 pool".to_string(),
             pool_visibility: types::ObjectVisibility::Public,
-            ipv6_prefix: "2001:db8::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix: "2001:db8:1::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
             ipv6_prefix_len: 48,
         };
         let pool_id = ipv6_store.create_pool(&pool).unwrap();
@@ -108,7 +108,7 @@ pub mod example_data {
             name: "Example IPv6 assignment".to_string(),
             description: "Example IPv6 assignment".to_string(),
             assignment_visibility: types::ObjectVisibility::Public,
-            ipv6_prefix: "2001:db8::1".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix: "2001:db8:1:1::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
             ipv6_prefix_len: 64,
         };
         ipv6_store.create_assignment(&assignment).unwrap();
@@ -368,7 +368,7 @@ mod tests {
             name: "Test assignment".to_string(),
             description: "Description".to_string(),
             assignment_visibility: types::ObjectVisibility::Public,
-            ipv6_prefix: "2001:db8::1".parse::<Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix: "2001:db8:0:1::".parse::<Ipv6Addr>().unwrap().octets(),
             ipv6_prefix_len: 64,
         };
         let assignment_id = ipv6_store.create_assignment(&assignment).unwrap();
