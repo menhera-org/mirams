@@ -3,6 +3,7 @@
 use dioxus::prelude::*;
 
 pub mod account;
+pub mod table;
 
 use crate::Route;
 
@@ -63,6 +64,42 @@ pub fn Drawer(props: DrawerProps) -> Element {
                     onclick: move |_| { crate::close_drawer(); },
                     "IPv6 Assignments",
                 }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BreadCrumb {
+    pub name: String,
+    pub route: Route,
+}
+
+#[derive(Clone, Debug, PartialEq, Props)]
+pub struct BreadCrumbsProps {
+    /// parent pages
+    pub crumbs: Vec<BreadCrumb>,
+
+    /// Short title for the current page
+    pub title: String,
+}
+
+#[component]
+pub fn BreadCrumbs(props: BreadCrumbsProps) -> Element {
+    rsx! {
+        div {
+            class: "breadcrumbs",
+            for crumb in props.crumbs {
+                Link {
+                    class: "crumb",
+                    to: crumb.route.clone(),
+                    "{crumb.name}",
+                }
+                " / "
+            }
+            span {
+                class: "breadcrumbs-current",
+                "{props.title}",
             }
         }
     }

@@ -352,3 +352,12 @@ body {
   margin: 1rem;
   background-color: #ffeeee;
 }
+
+#app-main a:not(.link-button) {
+  color: var(--theme-accent-color) !important;
+  text-decoration: none;
+}
+
+#app-main a:not(.link-button):is(:hover, :focus) {
+  text-decoration: underline;
+}
