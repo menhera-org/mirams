@@ -332,7 +332,7 @@ body {
   text-align: center;
 }
 
-.login-form-login-button {
+button:not(.link-button) {
   appearance: none;
   border: none;
   box-shadow: none;
@@ -416,4 +416,50 @@ body {
   overflow: auto;
   white-space: nowrap;
   box-sizing: border-box;
+}
+
+.add-button-toolbar {
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+  position: -webkit-sticky;
+  position: sticky;
+  inset-block-start: 0;
+  background-color: var(--theme-primary-background-color);
+}
+
+.add-button-toolbar .link-button {
+  color: var(--theme-accent-color);
+  max-inline-size: max-content;
+}
+
+.app-signed-out .add-button-toolbar {
+  display: none;
+}
+
+label:is(.select-label, .text-input) {
+  display: flex;
+  flex-direction: row;
+  column-gap: 1rem;
+  max-inline-size: 50rem;
+  align-items: center;
+  margin-block: 1rem;
+}
+
+label.text-input > input {
+  display: block;
+  font: inherit;
+  padding-inline: 1rem;
+  padding-block: .5rem;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+label.select-label > select {
+  display: block;
+  font: inherit;
+  padding-inline: 1rem;
+  padding-block: .5rem;
+  max-inline-size: max-content;
+  min-inline-size: 0;
 }

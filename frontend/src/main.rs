@@ -9,6 +9,8 @@ use dioxus_logger::tracing::{info, Level};
 
 use serde::{Deserialize, Serialize};
 
+use std::str::FromStr;
+
 pub const GITHUB_LINK: &str = "https://github.com/menhera-org/mirams";
 
 #[derive(Clone, Routable, Debug, PartialEq)]
@@ -32,11 +34,20 @@ pub enum Route {
     #[route("/asn/")]
     AsnSpaceList {},
 
+    #[route("/asn/space/add/")]
+    AsnSpaceAdd {},
+
     #[route("/asn/space/:space_id/")]
     AsnSpace { space_id: i32 },
 
+    #[route("/asn/space/:space_id/pool/add/")]
+    AsnPoolAdd { space_id: i32 },
+
     #[route("/asn/space/:space_id/pool/:pool_id/")]
     AsnPool { space_id: i32, pool_id: i32 },
+
+    #[route("/asn/space/:space_id/pool/:pool_id/assignment/add/")]
+    AsnAssignmentAdd { space_id: i32, pool_id: i32 },
 
     #[route("/asn/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
     AsnAssignment { space_id: i32, pool_id: i32, assignment_id: i32 },
@@ -47,11 +58,20 @@ pub enum Route {
     #[route("/ipv4/")]
     Ipv4SpaceList {},
 
+    #[route("/ipv4/space/add/")]
+    Ipv4SpaceAdd {},
+
     #[route("/ipv4/space/:space_id/")]
     Ipv4Space { space_id: i32 },
 
+    #[route("/ipv4/space/:space_id/pool/add/")]
+    Ipv4PoolAdd { space_id: i32 },
+
     #[route("/ipv4/space/:space_id/pool/:pool_id/")]
     Ipv4Pool { space_id: i32, pool_id: i32 },
+
+    #[route("/ipv4/space/:space_id/pool/:pool_id/assignment/add/")]
+    Ipv4AssignmentAdd { space_id: i32, pool_id: i32 },
 
     #[route("/ipv4/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
     Ipv4Assignment { space_id: i32, pool_id: i32, assignment_id: i32 },
@@ -62,11 +82,20 @@ pub enum Route {
     #[route("/ipv6/")]
     Ipv6SpaceList {},
 
+    #[route("/ipv6/space/add/")]
+    Ipv6SpaceAdd {},
+
     #[route("/ipv6/space/:space_id/")]
     Ipv6Space { space_id: i32 },
 
+    #[route("/ipv6/space/:space_id/pool/add/")]
+    Ipv6PoolAdd { space_id: i32 },
+
     #[route("/ipv6/space/:space_id/pool/:pool_id/")]
     Ipv6Pool { space_id: i32, pool_id: i32 },
+
+    #[route("/ipv6/space/:space_id/pool/:pool_id/assignment/add/")]
+    Ipv6AssignmentAdd { space_id: i32, pool_id: i32 },
 
     #[route("/ipv6/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
     Ipv6Assignment { space_id: i32, pool_id: i32, assignment_id: i32 },
@@ -101,6 +130,15 @@ fn Wrapper() -> Element {
 
     let drawer_open = use_context::<Signal<component::DrawerState>>();
     let drawer_open = drawer_open().open;
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let signed_in = user().is_some();
+
+    let mut class = if drawer_open { "app-drawer-open" } else { "app-drawer-closed" }.to_string();
+    if signed_in {
+        class.push_str(" app-signed-in");
+    } else {
+        class.push_str(" app-signed-out");
+    }
 
     rsx! {
         link {
@@ -117,7 +155,7 @@ fn Wrapper() -> Element {
         }
         div {
             id: "app",
-            class: if drawer_open { "app-drawer-open" } else { "app-drawer-closed" },
+            class: class,
             div {
                 id: "app-top-bar",
                 div {
@@ -303,6 +341,10 @@ fn AsnSpaceList() -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "ASNs" }
                 h1 { "ASN Assignment Spaces" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add ASN Assignment Space",
+                    add_button_route: Route::AsnSpaceAdd {},
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -390,6 +432,10 @@ fn AsnSpace(space_id: i32) -> Element {
                 h1 { "Assignment Space: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add ASN Assignment Pool",
+                    add_button_route: Route::AsnPoolAdd { space_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -497,6 +543,10 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
                 h1 { "Assignment Pool: {pool}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add ASN Assignment",
+                    add_button_route: Route::AsnAssignmentAdd { space_id, pool_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -652,6 +702,10 @@ fn Ipv4SpaceList() -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "IPv4" }
                 h1 { "IPv4 Assignment Spaces" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv4 Assignment Space",
+                    add_button_route: Route::Ipv4SpaceAdd {},
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -739,6 +793,10 @@ fn Ipv4Space(space_id: i32) -> Element {
                 h1 { "Assignment Space: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv4 Assignment Pool",
+                    add_button_route: Route::Ipv4PoolAdd { space_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -846,6 +904,10 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
                 h1 { "Assignment Pool: {pool}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv4 Assignment",
+                    add_button_route: Route::Ipv4AssignmentAdd { space_id, pool_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -1001,6 +1063,10 @@ fn Ipv6SpaceList() -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "IPv6" }
                 h1 { "IPv6 Assignment Spaces" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv6 Assignment Space",
+                    add_button_route: Route::Ipv6SpaceAdd {},
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -1088,6 +1154,10 @@ fn Ipv6Space(space_id: i32) -> Element {
                 h1 { "Assignment Space: {assignment}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv6 Assignment Pool",
+                    add_button_route: Route::Ipv6PoolAdd { space_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -1195,6 +1265,10 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
                 h1 { "Assignment Pool: {pool}" }
                 h2 { "{name}" }
                 p { "{description}" }
+                component::AddButtonToolbar {
+                    add_button_text: "Add IPv6 Assignment",
+                    add_button_route: Route::Ipv6AssignmentAdd { space_id, pool_id },
+                }
                 component::table::AssignmentTable { rows: table_rows }
             }
         }
@@ -1302,6 +1376,1094 @@ fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
             rsx! {
                 h1 { "Assignment" }
                 p { "Loading..." }
+            }
+        }
+    }
+}
+
+#[component]
+fn AsnSpaceAdd() -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut asn_from = use_signal(|| String::new());
+    let mut asn_to = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_space = move |_| {
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let mut asn_from = asn_from().trim().to_owned();
+        let mut asn_to = asn_to().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || asn_from.is_empty() || asn_to.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        if asn_from.starts_with("AS") {
+            asn_from = asn_from[2..].to_string();
+        }
+
+        if asn_to.starts_with("AS") {
+            asn_to = asn_to[2..].to_string();
+        }
+
+        let asn_from: u32 = match asn_from.parse() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid ASN from value".to_string()));
+                return;
+            }
+        };
+
+        let asn_to: u32 = match asn_to.parse() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid ASN to value".to_string()));
+                return;
+            }
+        };
+
+        if asn_from > asn_to {
+            error.set(Some("ASN from must be less than ASN to".to_string()));
+            return;
+        }
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_space = inet::AssignmentSpaceAsn {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            asn_from,
+            asn_to,
+            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/asn/assignment_space", &new_space, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::AsnSpaceList {});
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add ASN space".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add ASN Assignment Space" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "ASN From",
+                value: "{asn_from}",
+                oninput: move |e: Event<FormData>| asn_from.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "ASN To",
+                value: "{asn_to}",
+                oninput: move |e: Event<FormData>| asn_to.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_space,
+                "Add ASN Space"
+            }
+        }
+    }
+}
+
+#[component]
+fn AsnPoolAdd(space_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut asn_from = use_signal(|| String::new());
+    let mut asn_to = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_pool = move |_| {
+        let space_id = space_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let mut asn_from = asn_from().trim().to_owned();
+        let mut asn_to = asn_to().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || asn_from.is_empty() || asn_to.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        if asn_from.starts_with("AS") {
+            asn_from = asn_from[2..].to_string();
+        }
+
+        if asn_to.starts_with("AS") {
+            asn_to = asn_to[2..].to_string();
+        }
+
+        let asn_from: u32 = match asn_from.parse() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid ASN from value".to_string()));
+                return;
+            }
+        };
+
+        let asn_to: u32 = match asn_to.parse() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid ASN to value".to_string()));
+                return;
+            }
+        };
+
+        if asn_from > asn_to {
+            error.set(Some("ASN from must be less than ASN to".to_string()));
+            return;
+        }
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_pool = inet::AssignmentPoolAsn {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            asn_from,
+            asn_to,
+            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_space_id: space_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/asn/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::AsnSpace { space_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add ASN pool".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add ASN Assignment Pool" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "ASN From",
+                value: "{asn_from}",
+                oninput: move |e: Event<FormData>| asn_from.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "ASN To",
+                value: "{asn_to}",
+                oninput: move |e: Event<FormData>| asn_to.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_pool,
+                "Add ASN Pool"
+            }
+        }
+    }
+}
+
+#[component]
+fn AsnAssignmentAdd(space_id: i32, pool_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut asn = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_assignment = move |_| {
+        let space_id = space_id;
+        let pool_id = pool_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let mut asn = asn().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || asn.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        if asn.starts_with("AS") {
+            asn = asn[2..].to_string();
+        }
+
+        let asn: u32 = match asn.parse() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid ASN value".to_string()));
+                return;
+            }
+        };
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_assignment = inet::AssignmentAsn {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            asn,
+            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_pool_id: pool_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::AsnPool { space_id, pool_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add ASN assignment".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add ASN Assignment" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "ASN",
+                value: "{asn}",
+                oninput: move |e: Event<FormData>| asn.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_assignment,
+                "Add ASN Assignment"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv4SpaceAdd() -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv4_prefix = use_signal(|| String::new());
+    let mut ipv4_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_space = move |_| {
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv4_prefix = ipv4_prefix().trim().to_owned();
+        let ipv4_prefix_len = ipv4_prefix_len().trim().to_owned();
+
+        if name.is_empty() || ipv4_prefix.is_empty() || ipv4_prefix_len.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv4_prefix_len = match ipv4_prefix_len.parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv4 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
+        let (ipv4_prefix, ipv4_prefix_len) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = visibility().clone();
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_space = inet::AssignmentSpaceIpv4 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv4_prefix,
+            ipv4_prefix_len,
+            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/ipv4/assignment_space", &new_space, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv4SpaceList {});
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv4 space".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv4 Assignment Space" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix",
+                value: "{ipv4_prefix}",
+                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix Length",
+                value: "{ipv4_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_space,
+                "Add IPv4 Space"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv4PoolAdd(space_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv4_prefix = use_signal(|| String::new());
+    let mut ipv4_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_pool = move |_| {
+        let space_id = space_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv4_prefix = ipv4_prefix().trim().to_owned();
+        let ipv4_prefix_len = ipv4_prefix_len().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || ipv4_prefix.is_empty() || ipv4_prefix_len.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv4_prefix_len = match ipv4_prefix_len.parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv4 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
+        let (ipv4_prefix, ipv4_prefix_len) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_pool = inet::AssignmentPoolIpv4 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv4_prefix,
+            ipv4_prefix_len,
+            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_space_id: space_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv4Space { space_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv4 pool".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv4 Assignment Pool" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix",
+                value: "{ipv4_prefix}",
+                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix Length",
+                value: "{ipv4_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_pool,
+                "Add IPv4 Pool"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv4AssignmentAdd(space_id: i32, pool_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv4_prefix = use_signal(|| String::new());
+    let mut ipv4_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_assignment = move |_| {
+        let space_id = space_id;
+        let pool_id = pool_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv4_prefix = ipv4_prefix().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || ipv4_prefix.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv4_prefix_len = match ipv4_prefix_len().parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv4 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
+        let (ipv4_prefix, _) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_assignment = inet::AssignmentIpv4 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv4_prefix,
+            ipv4_prefix_len,
+            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_pool_id: pool_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv4Pool { space_id, pool_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv4 assignment".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv4 Assignment" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix",
+                value: "{ipv4_prefix}",
+                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv4 Prefix Length",
+                value: "{ipv4_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_assignment,
+                "Add IPv4 Assignment"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv6SpaceAdd() -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv6_prefix = use_signal(|| String::new());
+    let mut ipv6_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_space = move |_| {
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv6_prefix = ipv6_prefix().trim().to_owned();
+        let ipv6_prefix_len = ipv6_prefix_len().trim().to_owned();
+
+        if name.is_empty() || ipv6_prefix.is_empty() || ipv6_prefix_len.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv6_prefix_len = match ipv6_prefix_len.parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv6 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
+        let (ipv6_prefix, ipv6_prefix_len) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = visibility().clone();
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_space = inet::AssignmentSpaceIpv6 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv6_prefix,
+            ipv6_prefix_len,
+            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/ipv6/assignment_space", &new_space, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv6SpaceList {});
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv6 space".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv6 Assignment Space" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix",
+                value: "{ipv6_prefix}",
+                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix Length",
+                value: "{ipv6_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_space,
+                "Add IPv6 Space"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv6PoolAdd(space_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv6_prefix = use_signal(|| String::new());
+    let mut ipv6_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_pool = move |_| {
+        let space_id = space_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv6_prefix = ipv6_prefix().trim().to_owned();
+        let ipv6_prefix_len = ipv6_prefix_len().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || ipv6_prefix.is_empty() || ipv6_prefix_len.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv6_prefix_len = match ipv6_prefix_len.parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv6 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
+        let (ipv6_prefix, ipv6_prefix_len) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_pool = inet::AssignmentPoolIpv6 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv6_prefix,
+            ipv6_prefix_len,
+            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_space_id: space_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv6Space { space_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv6 pool".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv6 Assignment Pool" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix",
+                value: "{ipv6_prefix}",
+                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix Length",
+                value: "{ipv6_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_pool,
+                "Add IPv6 Pool"
+            }
+        }
+    }
+}
+
+#[component]
+fn Ipv6AssignmentAdd(space_id: i32, pool_id: i32) -> Element {
+    let token = use_token();
+    let mut name = use_signal(|| String::new());
+    let mut description = use_signal(|| String::new());
+    let mut ipv6_prefix = use_signal(|| String::new());
+    let mut ipv6_prefix_len = use_signal(|| String::new());
+    let mut visibility = use_signal(|| String::from("Public"));
+    let mut error = use_signal(|| None);
+
+    let add_assignment = move |_| {
+        let space_id = space_id;
+        let pool_id = pool_id;
+        let token = token.clone();
+        let name = name().trim().to_owned();
+        let description = description().trim().to_owned();
+        let ipv6_prefix = ipv6_prefix().trim().to_owned();
+        let visibility = visibility().clone();
+
+        if name.is_empty() || ipv6_prefix.is_empty() || visibility.is_empty() {
+            error.set(Some("All fields are required".to_string()));
+            return;
+        }
+
+        let ipv6_prefix_len = match ipv6_prefix_len().parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => {
+                error.set(Some("Invalid IPv6 prefix length value".to_string()));
+                return;
+            }
+        };
+
+        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
+        let (ipv6_prefix, _) = match prefix_obj {
+            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
+            Err(s) => {
+                error.set(Some(s.clone()));
+                return;
+            }
+        };
+
+        let visibility = match visibility.as_str() {
+            "Public" | "Private" => visibility,
+            _ => {
+                error.set(Some("Invalid visibility value".to_string()));
+                return;
+            }
+        };
+
+        let new_assignment = inet::AssignmentIpv6 {
+            id: 0, // This will be set by the server
+            name,
+            description,
+            ipv6_prefix,
+            ipv6_prefix_len,
+            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
+            assignment_pool_id: pool_id,
+        };
+
+        spawn(async move {
+            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
+            match res {
+                Ok(inet::ApiResponse { error: None, result: _ }) => {
+                    let nav = use_context::<Navigator>();
+                    nav.push(Route::Ipv6Pool { space_id, pool_id });
+                }
+                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
+                    error.set(Some(err));
+                }
+                Err(_) => {
+                    error.set(Some("Failed to add IPv6 assignment".to_string()));
+                }
+            }
+        });
+    };
+
+    rsx! {
+        div {
+            h1 { "Add IPv6 Assignment" }
+            if let Some(err) = error() {
+                p { style: "color: red;", "{err}" }
+            }
+            component::TextInput {
+                placeholder: "Name",
+                value: "{name}",
+                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "Description",
+                value: "{description}",
+                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix",
+                value: "{ipv6_prefix}",
+                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
+            }
+            component::TextInput {
+                placeholder: "IPv6 Prefix Length",
+                value: "{ipv6_prefix_len}",
+                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
+            }
+            label {
+                class: "select-label",
+                "Visibility"
+                select {
+                    value: "{visibility}",
+                    oninput: move |e| visibility.set(e.value().clone()),
+                    option { "Public" }
+                    option { "Private" }
+                }
+            }
+            button {
+                onclick: add_assignment,
+                "Add IPv6 Assignment"
             }
         }
     }

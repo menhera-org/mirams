@@ -5,6 +5,11 @@ use std::net::Ipv4Addr;
 use std::net::Ipv6Addr;
 use std::convert::TryFrom;
 use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
+
+pub type RawAsn = u32;
+pub type RawIpv4Addr = [u8; 4];
+pub type RawIpv6Addr = [u8; 16];
 
 pub fn format_asn_range(start: u32, end: u32) -> String {
     if start == end {
@@ -22,6 +27,190 @@ pub fn format_ipv4_prefix(prefix: [u8; 4], prefix_len: i32) -> String {
 pub fn format_ipv6_prefix(prefix: [u8; 16], prefix_len: i32) -> String {
     let ip = Ipv6Addr::from_bits(u128::from_be_bytes(prefix));
     format!("{}/{}", ip, prefix_len)
+}
+
+pub fn ipv4_subnet_mask(prefix_len: u8) -> RawIpv4Addr {
+    let mut mask = 0xffffffffu32;
+    mask = mask.checked_shr(prefix_len as u32).unwrap_or(0);
+    mask = !mask;
+    let mask = mask.to_be_bytes();
+    mask
+}
+
+pub fn ipv4_wildcard_mask(prefix_len: u8) -> RawIpv4Addr {
+    let mut mask = 0xffffffffu32;
+    mask = mask.checked_shr(prefix_len as u32).unwrap_or(0);
+    let mask = mask.to_be_bytes();
+    mask
+}
+
+/// First address in the network
+pub fn ipv4_network_address(ip: RawIpv4Addr, prefix_len: u8) -> RawIpv4Addr {
+    let mask = ipv4_subnet_mask(prefix_len);
+    let mut addr = [0; 4];
+    for i in 0..4 {
+        addr[i] = ip[i] & mask[i];
+    }
+    addr
+}
+
+/// Last address in the network
+pub fn ipv4_broadcast_address(ip: RawIpv4Addr, prefix_len: u8) -> RawIpv4Addr {
+    let wildcard = ipv4_wildcard_mask(prefix_len);
+    let mut addr = [0; 4];
+    for i in 0..4 {
+        addr[i] = ip[i] | wildcard[i];
+    }
+    addr
+}
+
+pub fn ipv6_subnet_mask(prefix_len: u8) -> RawIpv6Addr {
+    let mut mask = 0xffffffff_ffffffff_ffffffff_ffffffffu128;
+    mask = mask.checked_shr(prefix_len as u32).unwrap_or(0);
+    mask = !mask;
+    let mask = mask.to_be_bytes();
+    mask
+}
+
+pub fn ipv6_wildcard_mask(prefix_len: u8) -> RawIpv6Addr {
+    let mut mask = 0xffffffff_ffffffff_ffffffff_ffffffffu128;
+    mask = mask.checked_shr(prefix_len as u32).unwrap_or(0);
+    let mask = mask.to_be_bytes();
+    mask
+}
+
+/// First address in the network
+pub fn ipv6_network_address(ip: RawIpv6Addr, prefix_len: u8) -> RawIpv6Addr {
+    let mask = ipv6_subnet_mask(prefix_len);
+    let mut addr = [0; 16];
+    for i in 0..16 {
+        addr[i] = ip[i] & mask[i];
+    }
+    addr
+}
+
+/// Last address in the network
+pub fn ipv6_broadcast_address(ip: RawIpv6Addr, prefix_len: u8) -> RawIpv6Addr {
+    let wildcard = ipv6_wildcard_mask(prefix_len);
+    let mut addr = [0; 16];
+    for i in 0..16 {
+        addr[i] = ip[i] | wildcard[i];
+    }
+    addr
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Ipv4Prefix {
+    prefix: RawIpv4Addr,
+    prefix_len: i32,
+}
+
+impl Ipv4Prefix {
+    pub fn new(prefix: &str, prefix_len: i32) -> Result<Self, String> {
+        if prefix_len < 0 || prefix_len > 32 {
+            return Err(format!("Invalid IPv4 prefix length: {}", prefix_len));
+        }
+        let ip = match prefix.trim().parse::<Ipv4Addr>() {
+            Ok(ip) => ip,
+            Err(e) => return Err(format!("Invalid IPv4 address: {}", e)),
+        }.octets();
+        let network = ipv4_network_address(ip, prefix_len as u8);
+        if ip != network {
+            return Err(format!("Invalid IPv4 prefix: {} is not a network address for prefix length {}", prefix, prefix_len));
+        }
+        Ok(Ipv4Prefix {
+            prefix: ip,
+            prefix_len,
+        })
+    }
+
+    pub fn prefix(&self) -> String {
+        Ipv4Addr::new(self.prefix[0], self.prefix[1], self.prefix[2], self.prefix[3]).to_string()
+    }
+
+    pub fn prefix_octets(&self) -> [u8; 4] {
+        self.prefix
+    }
+
+    pub fn prefix_len(&self) -> i32 {
+        self.prefix_len
+    }
+
+    pub fn contains(&self, ip: &Self) -> bool {
+        if self.prefix_len > ip.prefix_len {
+            return false;
+        }
+        let mask = ipv4_subnet_mask(self.prefix_len as u8);
+        for i in 0..4 {
+            if (self.prefix[i] & mask[i]) != (ip.prefix[i] & mask[i]) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Display for Ipv4Prefix {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.prefix(), self.prefix_len)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Ipv6Prefix {
+    prefix: RawIpv6Addr,
+    prefix_len: i32,
+}
+
+impl Ipv6Prefix {
+    pub fn new(prefix: &str, prefix_len: i32) -> Result<Self, String> {
+        if prefix_len < 0 || prefix_len > 128 {
+            return Err(format!("Invalid IPv6 prefix length: {}", prefix_len));
+        }
+        let ip = match prefix.trim().parse::<Ipv6Addr>() {
+            Ok(ip) => ip,
+            Err(e) => return Err(format!("Invalid IPv6 address: {}", e)),
+        }.octets();
+        let network = ipv6_network_address(ip, prefix_len as u8);
+        if ip != network {
+            return Err(format!("Invalid IPv6 prefix: {} is not a network address for prefix length {}", prefix, prefix_len));
+        }
+        Ok(Ipv6Prefix {
+            prefix: ip,
+            prefix_len,
+        })
+    }
+
+    pub fn prefix(&self) -> String {
+        Ipv6Addr::from_bits(u128::from_be_bytes(self.prefix)).to_string()
+    }
+
+    pub fn prefix_octets(&self) -> [u8; 16] {
+        self.prefix
+    }
+
+    pub fn prefix_len(&self) -> i32 {
+        self.prefix_len
+    }
+
+    pub fn contains(&self, ip: &Self) -> bool {
+        if self.prefix_len > ip.prefix_len {
+            return false;
+        }
+        let mask = ipv6_subnet_mask(self.prefix_len as u8);
+        for i in 0..16 {
+            if (self.prefix[i] & mask[i]) != (ip.prefix[i] & mask[i]) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Display for Ipv6Prefix {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.prefix(), self.prefix_len)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -84,6 +273,20 @@ impl Display for ObjectVisibility {
         match self {
             ObjectVisibility::Public => write!(f, "Public"),
             ObjectVisibility::Private => write!(f, "Private"),
+        }
+    }
+}
+
+impl FromStr for ObjectVisibility {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Public" => Ok(ObjectVisibility::Public),
+            "Private" => Ok(ObjectVisibility::Private),
+            "public" => Ok(ObjectVisibility::Public),
+            "private" => Ok(ObjectVisibility::Private),
+            _ => Err(format!("Invalid visibility value: {}", s)),
         }
     }
 }

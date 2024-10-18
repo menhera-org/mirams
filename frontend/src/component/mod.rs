@@ -126,3 +126,40 @@ pub fn BreadCrumbs(props: BreadCrumbsProps) -> Element {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Props)]
+pub struct TextInputProps {
+    pub placeholder: String,
+    pub oninput: EventHandler<Event<FormData>>,
+    pub value: String,
+}
+
+#[component]
+pub fn TextInput(props: TextInputProps) -> Element {
+    rsx! {
+        label {
+            class: "text-input",
+            "{props.placeholder}",
+            input {
+                r#type: "text",
+                placeholder: props.placeholder,
+                oninput: move |e| props.oninput.call(e),
+                value: props.value,
+            }
+        }
+    }
+}
+
+#[component]
+pub fn AddButtonToolbar(add_button_text: String, add_button_route: Route) -> Element {
+    rsx! {
+        div {
+            class: "add-button-toolbar",
+            Link {
+                class: "add-button link-button",
+                to: add_button_route,
+                "{add_button_text}",
+            }
+        }
+    }
+}
