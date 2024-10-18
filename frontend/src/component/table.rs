@@ -31,26 +31,39 @@ pub struct TableRow {
 pub fn AssignmentTable(mut rows: Vec<TableRow>) -> Element {
     rsx! {
         table {
+            class: "assignment-table",
             thead {
                 tr {
                     th { "Assignment" }
                     th { "Name" }
                     th { "Description" }
-                    th { "Visibility" }
                 }
             }
             tbody {
                 for row in rows {
                     tr {
+                        class: if row.visibility == "Public" { "public" } else { "private" },
                         td {
-                            Link {
-                                to: NavigationTarget::<crate::Route>::from_str(&row.url).unwrap(),
-                                "{row.assignment}"
+                            div {
+                                class: "scrollable",
+                                Link {
+                                    to: NavigationTarget::<crate::Route>::from_str(&row.url).unwrap(),
+                                    "{row.assignment}"
+                                }
                             }
                         }
-                        td { "{row.name}" }
-                        td { "{row.description}" }
-                        td { "{row.visibility}" }
+                        td {
+                            div {
+                                class: "scrollable",
+                                "{row.name}"
+                            }
+                        }
+                        td {
+                            div {
+                                class: "scrollable",
+                                "{row.description}"
+                            }
+                        }
                     }
                 }
             }
