@@ -262,6 +262,9 @@ body {
   padding-block: .5rem;
   opacity: .8;
   cursor: pointer;
+  box-sizing: border-box;
+  inline-size: 100%;
+  text-align: start;
 }
 
 .link-button:hover {
@@ -322,6 +325,7 @@ body {
   appearance: none;
   background: transparent;
   font: inherit;
+  min-inline-size: 0;
 }
 
 .login-form-buttons {
