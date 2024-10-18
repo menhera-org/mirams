@@ -90,6 +90,8 @@ where
 {
     let mut router = Router::new();
 
+    router = router.route("/version", get(handler_version));
+
     router = router.route("/login", post(v1_login::api_v1_login));
 
     router = router.nest("/user", v1_user::build_router());
@@ -244,4 +246,16 @@ where
     R: Send + 'static,
 {
     tokio::task::spawn_blocking(move || f(store)).await.unwrap()
+}
+
+async fn handler_version() -> Response<Body> {
+    let json = serde_json::json!({
+        "error": serde_json::Value::Null,
+        "version": env!("CARGO_PKG_VERSION"),
+    });
+    Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(Body::from(serde_json::to_string(&json).unwrap()))
+        .unwrap()
 }
