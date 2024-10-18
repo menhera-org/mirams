@@ -2,19 +2,19 @@
 //! Endpoints for the IPv6 API
 //! - `GET /api/v1/ipv6/assignment_space` - List all assignment spaces
 //! - `POST /api/v1/ipv6/assignment_space` - Create a new assignment space
-//! - `GET /api/v1/ipv6/assignment_space/{space_id}` - Get an assignment space by ID
-//! - `PUT /api/v1/ipv6/assignment_space/{space_id}` - Update metadata for an assignment space by ID
-//! - `DELETE /api/v1/ipv6/assignment_space/{space_id}` - Delete an assignment space by ID
-//! - `GET /api/v1/ipv6/assignment_space/{space_id}/pool` - List all pools in an assignment space
-//! - `POST /api/v1/ipv6/assignment_space/{space_id}/pool` - Create a new pool in an assignment space
-//! - `GET /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}` - Get a pool by ID
-//! - `PUT /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}` - Update metadata for a pool by ID
-//! - `DELETE /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}` - Delete a pool by ID
-//! - `GET /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment` - List all assignments in a pool
-//! - `POST /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment` - Create a new assignment in a pool
-//! - `GET /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}` - Get an assignment by ID
-//! - `PUT /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}` - Update metadata for an assignment by ID
-//! - `DELETE /api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}` - Delete an assignment by ID
+//! - `GET /api/v1/ipv6/assignment_space/:space_id` - Get an assignment space by ID
+//! - `PUT /api/v1/ipv6/assignment_space/:space_id` - Update metadata for an assignment space by ID
+//! - `DELETE /api/v1/ipv6/assignment_space/:space_id` - Delete an assignment space by ID
+//! - `GET /api/v1/ipv6/assignment_space/:space_id/pool` - List all pools in an assignment space
+//! - `POST /api/v1/ipv6/assignment_space/:space_id/pool` - Create a new pool in an assignment space
+//! - `GET /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id` - Get a pool by ID
+//! - `PUT /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id` - Update metadata for a pool by ID
+//! - `DELETE /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id` - Delete a pool by ID
+//! - `GET /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id/assignment` - List all assignments in a pool
+//! - `POST /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id/assignment` - Create a new assignment in a pool
+//! - `GET /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Get an assignment by ID
+//! - `PUT /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Update metadata for an assignment by ID
+//! - `DELETE /api/v1/ipv6/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Delete an assignment by ID
 //! 
 //! GET endpoints accept unauthenticated requests if object visibility is set to `ObjectVisibility::Public`.
 
@@ -750,21 +750,21 @@ where
 
     router = router.route("/assignment_space", get(api_v1_ipv6_assignment_space_list::<T>).layer(AuthHandler::<T>::new_layer()));
     router = router.route("/assignment_space", post(api_v1_ipv6_assignment_space_create::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}", get(api_v1_ipv6_assignment_space_get::<T>).layer(AuthHandler::<T>::new_layer()));
-    router = router.route("/assignment_space/{space_id}", put(api_v1_ipv6_assignment_space_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}", delete(api_v1_ipv6_assignment_space_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id", get(api_v1_ipv6_assignment_space_get::<T>).layer(AuthHandler::<T>::new_layer()));
+    router = router.route("/assignment_space/:space_id", put(api_v1_ipv6_assignment_space_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id", delete(api_v1_ipv6_assignment_space_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
 
-    router = router.route("/assignment_space/{space_id}/pool", get(api_v1_ipv6_assignment_space_pool_list::<T>).layer(AuthHandler::<T>::new_layer()));
-    router = router.route("/assignment_space/{space_id}/pool", post(api_v1_ipv6_assignment_space_pool_create::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}", get(api_v1_ipv6_assignment_space_pool_get::<T>).layer(AuthHandler::<T>::new_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}", put(api_v1_ipv6_assignment_space_pool_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}", delete(api_v1_ipv6_assignment_space_pool_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool", get(api_v1_ipv6_assignment_space_pool_list::<T>).layer(AuthHandler::<T>::new_layer()));
+    router = router.route("/assignment_space/:space_id/pool", post(api_v1_ipv6_assignment_space_pool_create::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id", get(api_v1_ipv6_assignment_space_pool_get::<T>).layer(AuthHandler::<T>::new_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id", put(api_v1_ipv6_assignment_space_pool_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id", delete(api_v1_ipv6_assignment_space_pool_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
 
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}/assignment", get(api_v1_ipv6_assignment_space_pool_assignment_list::<T>).layer(AuthHandler::<T>::new_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}/assignment", post(api_v1_ipv6_assignment_space_pool_assignment_create::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}", get(api_v1_ipv6_assignment_space_pool_assignment_get::<T>).layer(AuthHandler::<T>::new_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}", put(api_v1_ipv6_assignment_space_pool_assignment_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
-    router = router.route("/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}", delete(api_v1_ipv6_assignment_space_pool_assignment_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id/assignment", get(api_v1_ipv6_assignment_space_pool_assignment_list::<T>).layer(AuthHandler::<T>::new_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id/assignment", post(api_v1_ipv6_assignment_space_pool_assignment_create::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id", get(api_v1_ipv6_assignment_space_pool_assignment_get::<T>).layer(AuthHandler::<T>::new_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id", put(api_v1_ipv6_assignment_space_pool_assignment_update::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
+    router = router.route("/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id", delete(api_v1_ipv6_assignment_space_pool_assignment_delete::<T>).layer(AuthHandler::<T>::new_auth_required_layer()));
 
     router = router.fallback(fallback_handler());
     router
