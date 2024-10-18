@@ -431,8 +431,18 @@ fn AsnSpace(space_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment Space: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::AsnSpace { space_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add ASN Assignment Pool",
                     add_button_route: Route::AsnPoolAdd { space_id },
@@ -579,8 +589,18 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{pool}" }
                 h1 { "Assignment Pool: {pool}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::AsnPool { space_id, pool_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add ASN Assignment",
                     add_button_route: Route::AsnAssignmentAdd { space_id, pool_id },
@@ -721,8 +741,18 @@ fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::AsnAssignment { space_id, pool_id, assignment_id });
+                        });
+                    }
+                }
                 div {
                     class: "delete-toolbar",
                     if delete_popup_shown() {
@@ -903,8 +933,18 @@ fn Ipv4Space(space_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment Space: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv4Space { space_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add IPv4 Assignment Pool",
                     add_button_route: Route::Ipv4PoolAdd { space_id },
@@ -1051,8 +1091,18 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{pool}" }
                 h1 { "Assignment Pool: {pool}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv4Pool { space_id, pool_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add IPv4 Assignment",
                     add_button_route: Route::Ipv4AssignmentAdd { space_id, pool_id },
@@ -1193,8 +1243,18 @@ fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv4Assignment { space_id, pool_id, assignment_id });
+                        });
+                    }
+                }
                 div {
                     class: "delete-toolbar",
                     if delete_popup_shown() {
@@ -1375,8 +1435,18 @@ fn Ipv6Space(space_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment Space: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv6Space { space_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add IPv6 Assignment Pool",
                     add_button_route: Route::Ipv6PoolAdd { space_id },
@@ -1523,8 +1593,18 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{pool}" }
                 h1 { "Assignment Pool: {pool}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv6Pool { space_id, pool_id });
+                        });
+                    }
+                }
                 component::AddButtonToolbar {
                     add_button_text: "Add IPv6 Assignment",
                     add_button_route: Route::Ipv6AssignmentAdd { space_id, pool_id },
@@ -1665,8 +1745,18 @@ fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
             rsx! {
                 component::BreadCrumbs { crumbs, title: "{assignment}" }
                 h1 { "Assignment: {assignment}" }
-                h2 { "{name}" }
-                p { "{description}" }
+                component::MetadataForm {
+                    name: name.clone(),
+                    description: description.clone(),
+                    onsubmit: move |metadata| {
+                        let token = use_token();
+                        let nav = use_context::<Navigator>();
+                        spawn(async move {
+                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
+                            nav.replace(Route::Ipv6Assignment { space_id, pool_id, assignment_id });
+                        });
+                    }
+                }
                 div {
                     class: "delete-toolbar",
                     if delete_popup_shown() {

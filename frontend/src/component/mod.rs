@@ -132,10 +132,12 @@ pub struct TextInputProps {
     pub placeholder: String,
     pub oninput: EventHandler<Event<FormData>>,
     pub value: String,
+    pub readonly: Option<bool>,
 }
 
 #[component]
 pub fn TextInput(props: TextInputProps) -> Element {
+    let readonly = props.readonly.unwrap_or(false);
     rsx! {
         label {
             class: "text-input",
@@ -145,6 +147,7 @@ pub fn TextInput(props: TextInputProps) -> Element {
                 placeholder: props.placeholder,
                 oninput: move |e| props.oninput.call(e),
                 value: props.value,
+                readonly: readonly,
             }
         }
     }
@@ -159,6 +162,54 @@ pub fn AddButtonToolbar(add_button_text: String, add_button_route: Route) -> Ele
                 class: "add-button link-button",
                 to: add_button_route,
                 "{add_button_text}",
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct MetadataUpdateRequest {
+    pub name: String,
+    pub description: String,
+}
+
+#[component]
+pub fn MetadataForm(name: String, description: String, onsubmit: EventHandler<MetadataUpdateRequest>) -> Element {
+    let mut name = use_signal(|| name.clone());
+    let mut description = use_signal(|| description.clone());
+    let user = use_context::<Signal<Option<account::User>>>();
+    let signed_in = user().is_some();
+
+    rsx! {
+        div {
+            class: "metadata-form",
+            TextInput {
+                placeholder: "Name",
+                value: name(),
+                oninput: move |e: Event<FormData>| name.set(e.value()),
+                readonly: !signed_in,
+            }
+            TextInput {
+                placeholder: "Description",
+                value: description(),
+                oninput: move |e: Event<FormData>| description.set(e.value()),
+                readonly: !signed_in,
+            }
+            if signed_in {
+                div {
+                    class: "metadata-form-buttons",
+                    button {
+                        class: "metadata-form-submit-button",
+                        r#type: "button",
+                        onclick: move |_| {
+                            onsubmit.call(MetadataUpdateRequest {
+                                name: name(),
+                                description: description(),
+                            });
+                        },
+                        "Save",
+                    }
+                }
             }
         }
     }

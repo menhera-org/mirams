@@ -472,3 +472,9 @@ label.select-label > select {
   column-gap: 2rem;
   align-items: center;
 }
+
+.metadata-form {
+  padding-block-end: 1rem;
+  border-block-end: solid 1px var(--theme-disabled-text-color);
+  margin-block-end: 1rem;
+}
