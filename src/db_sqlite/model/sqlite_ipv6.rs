@@ -312,7 +312,7 @@ impl Ipv6AssignmentStore for SqliteIpv6AssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::ipv6::AssignmentIpv6>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, ipv6_prefix, ipv6_prefix_len, assignment_pool_id FROM assignment_ipv6, assignment_visibility WHERE assignment_pool_id = ? ORDER BY ipv6_prefix ASC")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, ipv6_prefix, ipv6_prefix_len, assignment_pool_id, assignment_visibility FROM assignment_ipv6 WHERE assignment_pool_id = ? ORDER BY ipv6_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![pool_id])?;
         let mut assignments = Vec::new();
         while let Some(row) = rows.next()? {

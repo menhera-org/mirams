@@ -314,7 +314,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::ipv4::AssignmentIpv4>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id FROM assignment_ipv4, assignment_visibility WHERE assignment_pool_id = ? ORDER BY ipv4_prefix ASC")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, ipv4_prefix, ipv4_prefix_len, assignment_pool_id, assignment_visibility FROM assignment_ipv4 WHERE assignment_pool_id = ? ORDER BY ipv4_prefix ASC")?;
         let mut rows = stmt.query(rusqlite::params![pool_id])?;
         let mut assignments = Vec::new();
         while let Some(row) = rows.next()? {

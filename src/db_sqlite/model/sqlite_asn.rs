@@ -215,7 +215,7 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
     fn get_assignments(&self, pool_id: i32) -> Result<Vec<crate::asn::AssignmentAsn>, Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn FROM assignment_asn, assignment_visibility WHERE assignment_pool_id = ? ORDER BY asn ASC")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, assignment_pool_id, asn, assignment_visibility FROM assignment_asn WHERE assignment_pool_id = ? ORDER BY asn ASC")?;
         let rows = stmt.query_map(rusqlite::params![pool_id], |row| {
             Ok(crate::asn::AssignmentAsn {
                 id: row.get(0)?,
