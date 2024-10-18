@@ -17,10 +17,10 @@ use std::error::Error as StdError;
 #[serde(rename_all = "snake_case")]
 #[repr(i32)]
 pub enum ObjectVisibility {
-    /// Child assignments visible to everyone
+    /// Assignment visible to everyone
     Public = 0,
 
-    /// Child assignments only visible to logged-in users
+    /// Assignment only visible to logged-in users
     Private = 1,
 }
 
