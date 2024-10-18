@@ -36,7 +36,7 @@ impl GlobalConfig {
 
     pub fn run(&self) {
         match &self.command {
-            Commands::Server { listen_addr: _ } => server(self.clone()),
+            Commands::Server { listen_addr: _, with_example_data: _ } => server(self.clone()),
             Commands::UserSetPassword { username: _, password: _ } => user_set_password(self.clone()),
             Commands::UserDelete { username: _ } => user_delete(self.clone()),
             Commands::UserList => user_list(self.clone()),
@@ -105,8 +105,13 @@ fn main() {
 fn server(global_config: GlobalConfig) {
     let mut listen_addr = std::env::var("MIRAMS_LISTEN_ADDR").unwrap_or("127.0.0.1:3001".to_string());
 
+    let mut add_example_data = false;
+
     if let Some(addr) = match &global_config.command {
-        Commands::Server { listen_addr } => listen_addr.clone(),
+        Commands::Server { listen_addr, with_example_data } => {
+            add_example_data = *with_example_data;
+            listen_addr.clone()
+        },
         _ => None,
     } {
         listen_addr = addr;
@@ -121,6 +126,13 @@ fn server(global_config: GlobalConfig) {
         let user = "admin";
         store.users().set_password(user, &password).unwrap();
         log::info!("Created user 'admin' with password '{}'", password);
+    }
+
+    if !global_config.is_in_memory_db() && add_example_data {
+        log::warn!("Example data can only be added to an in-memory database. Ignoring --with-example-data.");
+    } else if add_example_data {
+        log::info!("Adding example data to the database");
+        mirams::example_data::add_example_data(store.clone());
     }
 
     let server = Server::new(store);

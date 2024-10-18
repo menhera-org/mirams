@@ -16,6 +16,106 @@ pub use types::Error;
 pub use types::ErrorKind;
 
 
+pub mod example_data {
+    use crate::*;
+
+    pub fn add_example_data<T: store::DbConnection + Clone + Send + Sync + 'static>(store: store::Store<T>) {
+        let asn_store = store.asn_assignments();
+        let ipv4_store = store.ipv4_assignments();
+        let ipv6_store = store.ipv6_assignments();
+
+        let space = asn::AssignmentSpaceAsn {
+            id: 0,
+            name: "Example ASN space".to_string(),
+            description: "Example ASN space".to_string(),
+            space_visibility: types::ObjectVisibility::Public,
+            asn_from: 65000,
+            asn_to: 65199,
+        };
+        let space_id = asn_store.create_space(&space).unwrap();
+        let pool = asn::AssignmentPoolAsn {
+            id: 0,
+            assignment_space_id: space_id,
+            name: "Example ASN pool".to_string(),
+            description: "Example ASN pool".to_string(),
+            pool_visibility: types::ObjectVisibility::Public,
+            asn_from: 65000,
+            asn_to: 65099,
+        };
+        let pool_id = asn_store.create_pool(&pool).unwrap();
+        let assignment = asn::AssignmentAsn {
+            id: 0,
+            assignment_pool_id: pool_id,
+            name: "Example ASN assignment".to_string(),
+            description: "Example ASN assignment".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
+            asn: 65000,
+        };
+        asn_store.create_assignment(&assignment).unwrap();
+
+        let space = ipv4::AssignmentSpaceIpv4 {
+            id: 0,
+            name: "Example IPv4 space".to_string(),
+            description: "Example IPv4 space".to_string(),
+            space_visibility: types::ObjectVisibility::Public,
+            ipv4_prefix: [192, 168, 0, 0],
+            ipv4_prefix_len: 16,
+        };
+        let space_id = ipv4_store.create_space(&space).unwrap();
+        let pool = ipv4::AssignmentPoolIpv4 {
+            id: 0,
+            assignment_space_id: space_id,
+            name: "Example IPv4 pool".to_string(),
+            description: "Example IPv4 pool".to_string(),
+            pool_visibility: types::ObjectVisibility::Public,
+            ipv4_prefix: [192, 168, 0, 0],
+            ipv4_prefix_len: 24,
+        };
+        let pool_id = ipv4_store.create_pool(&pool).unwrap();
+        let assignment = ipv4::AssignmentIpv4 {
+            id: 0,
+            assignment_pool_id: pool_id,
+            name: "Example IPv4 assignment".to_string(),
+            description: "Example IPv4 assignment".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
+            ipv4_prefix: [192, 168, 0, 1],
+            ipv4_prefix_len: 32,
+        };
+        ipv4_store.create_assignment(&assignment).unwrap();
+
+        let space = ipv6::AssignmentSpaceIpv6 {
+            id: 0,
+            name: "Example IPv6 space".to_string(),
+            description: "Example IPv6 space".to_string(),
+            space_visibility: types::ObjectVisibility::Public,
+            ipv6_prefix: "2001:db8::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix_len: 32,
+        };
+        let space_id = ipv6_store.create_space(&space).unwrap();
+        let pool = ipv6::AssignmentPoolIpv6 {
+            id: 0,
+            assignment_space_id: space_id,
+            name: "Example IPv6 pool".to_string(),
+            description: "Example IPv6 pool".to_string(),
+            pool_visibility: types::ObjectVisibility::Public,
+            ipv6_prefix: "2001:db8::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix_len: 48,
+        };
+        let pool_id = ipv6_store.create_pool(&pool).unwrap();
+        let assignment = ipv6::AssignmentIpv6 {
+            id: 0,
+            assignment_pool_id: pool_id,
+            name: "Example IPv6 assignment".to_string(),
+            description: "Example IPv6 assignment".to_string(),
+            assignment_visibility: types::ObjectVisibility::Public,
+            ipv6_prefix: "2001:db8::1".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            ipv6_prefix_len: 64,
+        };
+        ipv6_store.create_assignment(&assignment).unwrap();
+    }
+}
+
+
 /// Top-level tests
 #[cfg(test)]
 mod tests {

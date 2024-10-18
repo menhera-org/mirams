@@ -28,6 +28,10 @@ pub(crate) enum Commands {
         /// Address to listen on
         #[arg(short, long)]
         listen_addr: Option<String>,
+
+        /// Enable example dataset
+        #[arg(long)]
+        with_example_data: bool,
     },
 
     /// Set a user's password. If the user does not exist, it will be created.
