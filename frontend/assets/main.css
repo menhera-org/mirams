@@ -378,21 +378,16 @@ button:not(.link-button) {
   inline-size: 100%;
   box-sizing: border-box;
   border-spacing: 0;
-  max-inline-size: max-content;
 }
 
 .assignment-table :is(th, td) {
   border: solid 1px var(--theme-disabled-text-color);
-  max-inline-size: max-content;
-  inline-size: max-content;
-  min-inline-size: 0;
   overflow-inline: auto;
 }
 
 .assignment-table td > .scrollable, .assignment-table th {
   padding-inline: 1rem;
   padding-block: .5rem;
-  max-inline-size: max-content;
 }
 
 .assignment-table > tbody > tr:nth-of-type(2n + 1) {
