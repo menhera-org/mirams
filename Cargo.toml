@@ -37,10 +37,12 @@ multi_log = "0.1.2"
 rand = "0.10"
 
 [build-dependencies]
-dioxus-cli = "0.7"
-dioxus-cli-config = "0.7"
+dioxus-cli = { version = "0.7", artifact = "bin:dx" }
 
 [workspace]
 members = [
     "frontend", "proc-macros",
 ]
+
+[package.metadata.docs.rs]
+cargo-args = ["-Z", "bindeps"]

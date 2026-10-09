@@ -15,24 +15,13 @@ fn main () {
         return;
     }
 
-    let _config = DioxusConfig::load(Some(bin.clone())).unwrap().unwrap_or(DioxusConfig::default());
-    let opts = cli::cfg::ConfigOptsBuild {
-        release: true,
-        force_debug: false,
-        verbose: false,
-        skip_assets: false,
-        client_feature: "web".to_string(),
-        server_feature: "server".to_string(),
-        example: None,
-        profile: None,
-        platform: Some(Platform::Web),
-        features: None,
-        target: None,
-        cargo_args: vec![],
-    };
-    let build = cli::build::Build {
-        build: opts,
-    };
-    build.build(Some(bin.clone()), None, None).unwrap();
+    let dx = std::env::var_os("CARGO_BIN_FILE_DIOXUS_CLI_dx")
+        .expect("Cargo did not supply the dx artifact");
+
+    let _ = std::process::Command::new(dx)
+        .current_dir("frontend")
+        .args(["build", "--web", "--release", "--skip-assets"])
+        .status()
+        .expect("failed to run dx");
 }
 
