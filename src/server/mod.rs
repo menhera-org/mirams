@@ -1,6 +1,9 @@
 
 pub mod api;
 
+#[cfg(test)]
+mod static_asset_tests;
+
 use crate::static_files::frontend_files;
 use crate::static_files::types_by_ext;
 use crate::store::Store;

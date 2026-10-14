@@ -56,4 +56,8 @@ fn main() {
         std::fs::remove_dir_all(&frontend_dist).expect("failed to clear frontend-dist");
     }
     copy_dir(&public_dir, &frontend_dist).expect("failed to copy frontend bundle to frontend-dist");
+    // Dioxus 0.7 bundles asset!() references, but the frontend also uses stable
+    // URLs such as /main.css and /icon.svg for files in the legacy assets folder.
+    copy_dir(&bin.join("assets"), &frontend_dist)
+        .expect("failed to copy frontend static assets to frontend-dist");
 }
