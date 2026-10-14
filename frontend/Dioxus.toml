@@ -7,7 +7,7 @@ name = "frontend"
 # web, desktop, fullstack
 default_platform = "web"
 
-# `build` & `serve` dist path
+# `dx bundle` output path (build.rs flattens public/ into this directory)
 out_dir = "../frontend-dist"
 
 # resource (assets) file folder

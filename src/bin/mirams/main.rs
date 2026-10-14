@@ -9,8 +9,8 @@ use mirams::db_sqlite::SqliteConnection;
 use mirams::server::Server;
 
 use clap::Parser;
+use rand::RngExt;
 use syslog::{Facility, Formatter3164, BasicLogger};
-use rand::prelude::*;
 
 use std::path::PathBuf;
 
@@ -120,8 +120,9 @@ fn server(global_config: GlobalConfig) {
     let store = global_config.store();
 
     if global_config.is_in_memory_db() {
-        let mut rng = rand::thread_rng();
-        let password: [u8; 8] = rng.gen();
+        let mut rng = rand::rng();
+        let mut password: [u8; 8] = [0; 8];
+        rng.fill(&mut password);
         let password = hex::encode(password);
         let user = "admin";
         store.users().set_password(user, &password).unwrap();
