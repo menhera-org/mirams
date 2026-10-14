@@ -172,12 +172,14 @@ pub fn AddButtonToolbar(add_button_text: String, add_button_route: Route) -> Ele
 pub struct MetadataUpdateRequest {
     pub name: String,
     pub description: String,
+    pub visibility: crate::inet::ObjectVisibility,
 }
 
 #[component]
-pub fn MetadataForm(name: String, description: String, onsubmit: EventHandler<MetadataUpdateRequest>) -> Element {
+pub fn MetadataForm(name: String, description: String, visibility: crate::inet::ObjectVisibility, error: Option<String>, onsubmit: EventHandler<MetadataUpdateRequest>) -> Element {
     let mut name = use_signal(|| name.clone());
     let mut description = use_signal(|| description.clone());
+    let mut visibility = use_signal(|| visibility);
     let user = use_context::<Signal<Option<account::User>>>();
     let signed_in = user().is_some();
 
@@ -196,6 +198,26 @@ pub fn MetadataForm(name: String, description: String, onsubmit: EventHandler<Me
                 oninput: move |e: Event<FormData>| description.set(e.value()),
                 readonly: !signed_in,
             }
+            label {
+                class: "text-input",
+                "Visibility",
+                select {
+                    value: visibility().to_string(),
+                    disabled: !signed_in,
+                    oninput: move |e| {
+                        visibility.set(if e.value() == "Private" {
+                            crate::inet::ObjectVisibility::Private
+                        } else {
+                            crate::inet::ObjectVisibility::Public
+                        });
+                    },
+                    option { value: "Public", "Public" }
+                    option { value: "Private", "Private" }
+                }
+            }
+            if let Some(error) = error {
+                p { role: "alert", "{error}" }
+            }
             if signed_in {
                 div {
                     class: "metadata-form-buttons",
@@ -206,6 +228,7 @@ pub fn MetadataForm(name: String, description: String, onsubmit: EventHandler<Me
                             onsubmit.call(MetadataUpdateRequest {
                                 name: name(),
                                 description: description(),
+                                visibility: visibility(),
                             });
                         },
                         "Save",

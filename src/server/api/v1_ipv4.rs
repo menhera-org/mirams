@@ -3,17 +3,17 @@
 //! - `GET /api/v1/ipv4/assignment_space` - List all assignment spaces
 //! - `POST /api/v1/ipv4/assignment_space` - Create a new assignment space
 //! - `GET /api/v1/ipv4/assignment_space/:space_id` - Get an assignment space by ID
-//! - `PUT /api/v1/ipv4/assignment_space/:space_id` - Update metadata for an assignment space by ID
+//! - `PUT /api/v1/ipv4/assignment_space/:space_id` - Update metadata and visibility for an assignment space by ID
 //! - `DELETE /api/v1/ipv4/assignment_space/:space_id` - Delete an assignment space by ID
 //! - `GET /api/v1/ipv4/assignment_space/:space_id/pool` - List all pools in an assignment space
 //! - `POST /api/v1/ipv4/assignment_space/:space_id/pool` - Create a new pool in an assignment space
 //! - `GET /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id` - Get a pool by ID
-//! - `PUT /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id` - Update metadata for a pool by ID
+//! - `PUT /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id` - Update metadata and visibility for a pool by ID
 //! - `DELETE /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id` - Delete a pool by ID
 //! - `GET /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment` - List all assignments in a pool
 //! - `POST /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment` - Create a new assignment in a pool
 //! - `GET /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Get an assignment by ID
-//! - `PUT /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Update metadata for an assignment by ID
+//! - `PUT /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Update metadata and visibility for an assignment by ID
 //! - `DELETE /api/v1/ipv4/assignment_space/:space_id/pool/:pool_id/assignment/:assignment_id` - Delete an assignment by ID
 //! 
 //! GET endpoints accept unauthenticated requests if object visibility is set to `ObjectVisibility::Public`.
@@ -170,7 +170,7 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
-        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_space(space_id, &req.name, &req.description)).await {
+        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_space(space_id, &req.name, &req.description, req.visibility)).await {
             Ok(_) => {
                 if let Ok(space) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_space(space_id)).await {
                     let res = ApiResponse {
@@ -403,7 +403,7 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
-        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_pool(pool_id, &req.name, &req.description)).await {
+        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_pool(pool_id, &req.name, &req.description, req.visibility)).await {
             Ok(_) => {
                 if let Ok(pool) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_pool(pool_id)).await {
                     let res = ApiResponse {
@@ -491,7 +491,7 @@ where
             let space_id = pool.assignment_space_id;
 
             if let Ok(space) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_space(space_id)).await {
-                if space.id != pool.assignment_space_id {
+                if space.id != pool.assignment_space_id || (user.is_none() && space.space_visibility != ObjectVisibility::Public) {
                     let res = ApiResponse {
                         error: Some("Pool not found".to_string()),
                         result: None,
@@ -614,7 +614,7 @@ where
                     let space_id = pool.assignment_space_id;
 
                     if let Ok(space) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_space(space_id)).await {
-                        if space.id != pool.assignment_space_id {
+                        if space.id != pool.assignment_space_id || (user.is_none() && space.space_visibility != ObjectVisibility::Public) {
                             let res = ApiResponse {
                                 error: Some("Assignment not found".to_string()),
                                 result: None,
@@ -674,7 +674,7 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
-        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_assignment(assignment_id, &req.name, &req.description)).await {
+        let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_assignment(assignment_id, &req.name, &req.description, req.visibility)).await {
             Ok(_) => {
                 if let Ok(assignment) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_assignment(assignment_id)).await {
                     let res = ApiResponse {

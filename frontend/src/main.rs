@@ -3,6 +3,7 @@
 pub mod component;
 pub mod fetch;
 pub mod inet;
+mod session;
 
 use crate::dioxus_router::Navigator;
 use dioxus::prelude::*;
@@ -111,7 +112,7 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    use_context_provider(|| Signal::new(Option::<component::account::User>::None));
+    use_context_provider(|| Signal::new(session::load_user()));
     use_context_provider(|| Signal::new(component::DrawerState { open: false }));
 
     rsx! {
@@ -127,11 +128,12 @@ pub fn close_drawer() {
 #[component]
 fn Wrapper() -> Element {
     let nav = navigator();
-    use_context_provider(move || nav.clone());
+    let nav_context = nav.clone();
+    use_context_provider(move || nav_context);
 
     let drawer_open = use_context::<Signal<component::DrawerState>>();
     let drawer_open = drawer_open().open;
-    let user = use_context::<Signal<Option<component::account::User>>>();
+    let mut user = use_context::<Signal<Option<component::account::User>>>();
     let signed_in = user().is_some();
 
     let mut class = if drawer_open { "app-drawer-open" } else { "app-drawer-closed" }.to_string();
@@ -192,10 +194,9 @@ fn Wrapper() -> Element {
                 },
             }
             component::Drawer {
-                onlogout: |_| {
-                    let mut user = use_context::<Signal<Option<component::account::User>>>();
+                onlogout: move |_| {
+                    session::save_user(None);
                     user.set(None);
-                    let nav = use_context::<Navigator>();
                     nav.push(Route::Home {});
                 },
             }
@@ -260,8 +261,10 @@ pub struct LoginResult {
 fn Login() -> Element {
     let mut error = use_signal(|| None);
     let mut user = use_context::<Signal<Option<component::account::User>>>();
+    let nav = navigator();
 
     let log_in = move |attempt: component::account::LoginAttempt| {
+        let nav = nav.clone();
         spawn(async move {
             let username = attempt.username.clone();
 
@@ -277,12 +280,13 @@ fn Login() -> Element {
                 }
             };
 
-            user.set(Some(component::account::User {
+            let signed_in_user = component::account::User {
                 username,
                 api_token: res.api_token,
-            }));
+            };
+            session::save_user(Some(&signed_in_user));
+            user.set(Some(signed_in_user));
 
-            let nav = use_context::<Navigator>();
             nav.replace(Route::Home {});
         });
     };
@@ -360,9 +364,11 @@ fn AsnSpaceList() -> Element {
 
 #[component]
 fn AsnSpace(space_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
@@ -422,6 +428,7 @@ fn AsnSpace(space_id: i32) -> Element {
             let assignment = inet::format_asn_range(space.asn_from, space.asn_to);
             let name = space.name.clone();
             let description = space.description.clone();
+            let visibility = space.space_visibility;
             let crumbs = vec![component::BreadCrumb {
                 name: "Home".to_string(),
                 route: Route::Home {},
@@ -435,12 +442,17 @@ fn AsnSpace(space_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::AsnSpace { space_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -498,9 +510,11 @@ fn AsnSpace(space_id: i32) -> Element {
 
 #[component]
 fn AsnPool(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
@@ -575,6 +589,7 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
             }).collect::<Vec<_>>();
             let name = pool.name.clone();
             let description = pool.description.clone();
+            let visibility = pool.pool_visibility;
             let space = inet::format_asn_range(space.asn_from, space.asn_to);
             let pool = inet::format_asn_range(pool.asn_from, pool.asn_to);
             let crumbs = vec![component::BreadCrumb {
@@ -593,12 +608,17 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::AsnPool { space_id, pool_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -656,9 +676,11 @@ fn AsnPool(space_id: i32, pool_id: i32) -> Element {
 
 #[component]
 fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
@@ -723,6 +745,7 @@ fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
         Some(Some((space, pool, assignment))) => {
             let name = assignment.name.clone();
             let description = assignment.description.clone();
+            let visibility = assignment.assignment_visibility;
             let space = inet::format_asn_range(space.asn_from, space.asn_to);
             let pool = inet::format_asn_range(pool.asn_from, pool.asn_to);
             let assignment = inet::format_asn_range(assignment.asn, assignment.asn);
@@ -745,12 +768,17 @@ fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::AsnAssignment { space_id, pool_id, assignment_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -862,9 +890,11 @@ fn Ipv4SpaceList() -> Element {
 
 #[component]
 fn Ipv4Space(space_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
@@ -924,6 +954,7 @@ fn Ipv4Space(space_id: i32) -> Element {
             let assignment = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
             let name = space.name.clone();
             let description = space.description.clone();
+            let visibility = space.space_visibility;
             let crumbs = vec![component::BreadCrumb {
                 name: "Home".to_string(),
                 route: Route::Home {},
@@ -937,12 +968,17 @@ fn Ipv4Space(space_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv4Space { space_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -1000,9 +1036,11 @@ fn Ipv4Space(space_id: i32) -> Element {
 
 #[component]
 fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
@@ -1077,6 +1115,7 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
             }).collect::<Vec<_>>();
             let name = pool.name.clone();
             let description = pool.description.clone();
+            let visibility = pool.pool_visibility;
             let space = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
             let pool = inet::format_ipv4_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len);
             let crumbs = vec![component::BreadCrumb {
@@ -1095,12 +1134,17 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv4Pool { space_id, pool_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -1158,9 +1202,11 @@ fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
 
 #[component]
 fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
@@ -1225,6 +1271,7 @@ fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
         Some(Some((space, pool, assignment))) => {
             let name = assignment.name.clone();
             let description = assignment.description.clone();
+            let visibility = assignment.assignment_visibility;
             let space = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
             let pool = inet::format_ipv4_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len);
             let assignment = inet::format_ipv4_prefix(assignment.ipv4_prefix, assignment.ipv4_prefix_len);
@@ -1247,12 +1294,17 @@ fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv4Assignment { space_id, pool_id, assignment_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -1364,9 +1416,11 @@ fn Ipv6SpaceList() -> Element {
 
 #[component]
 fn Ipv6Space(space_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
@@ -1426,6 +1480,7 @@ fn Ipv6Space(space_id: i32) -> Element {
             let assignment = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
             let name = space.name.clone();
             let description = space.description.clone();
+            let visibility = space.space_visibility;
             let crumbs = vec![component::BreadCrumb {
                 name: "Home".to_string(),
                 route: Route::Home {},
@@ -1439,12 +1494,17 @@ fn Ipv6Space(space_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv6Space { space_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -1502,9 +1562,11 @@ fn Ipv6Space(space_id: i32) -> Element {
 
 #[component]
 fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
@@ -1579,6 +1641,7 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
             }).collect::<Vec<_>>();
             let name = pool.name.clone();
             let description = pool.description.clone();
+            let visibility = pool.pool_visibility;
             let space = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
             let pool = inet::format_ipv6_prefix(pool.ipv6_prefix, pool.ipv6_prefix_len);
             let crumbs = vec![component::BreadCrumb {
@@ -1597,12 +1660,17 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv6Pool { space_id, pool_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }
@@ -1660,9 +1728,11 @@ fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
 
 #[component]
 fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let token = use_token();
+    let current_user = use_context::<Signal<Option<component::account::User>>>();
+    let token = current_user().map(|user| user.api_token);
+    let mut save_error = use_signal(|| None::<String>);
     let mut delete_popup_shown = use_signal(|| false);
-    let future = use_resource(move || {
+    let mut future = use_resource(move || {
         let token = token.clone();
         async move {
             let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
@@ -1727,6 +1797,7 @@ fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
         Some(Some((space, pool, assignment))) => {
             let name = assignment.name.clone();
             let description = assignment.description.clone();
+            let visibility = assignment.assignment_visibility;
             let space = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
             let pool = inet::format_ipv6_prefix(pool.ipv6_prefix, pool.ipv6_prefix_len);
             let assignment = inet::format_ipv6_prefix(assignment.ipv6_prefix, assignment.ipv6_prefix_len);
@@ -1749,12 +1820,17 @@ fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
                 component::MetadataForm {
                     name: name.clone(),
                     description: description.clone(),
+                    visibility,
+                    error: save_error(),
                     onsubmit: move |metadata| {
-                        let token = use_token();
-                        let nav = use_context::<Navigator>();
+                        let token = current_user().map(|user| user.api_token);
+                        save_error.set(None);
                         spawn(async move {
-                            let _ = fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await;
-                            nav.replace(Route::Ipv6Assignment { space_id, pool_id, assignment_id });
+                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
+                                Ok(response) if response.error.is_none() => future.restart(),
+                                Ok(response) => save_error.set(response.error),
+                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            }
                         });
                     }
                 }

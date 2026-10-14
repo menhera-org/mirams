@@ -1,6 +1,6 @@
 
 use crate::db_sqlite::SqliteConnection;
-use crate::types::{Error, ErrorKind};
+use crate::types::{Error, ErrorKind, ObjectVisibility};
 
 use crate::ipv4::Ipv4AssignmentStore;
 
@@ -65,48 +65,8 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
     }
 
     fn create_space(&self, space: &crate::ipv4::AssignmentSpaceIpv4) -> Result<i32, Error> {
-        use crate::ipv4::ipv4_network_address;
-        use crate::ipv4::ipv4_broadcast_address;
-
         let mut conn = self.db.get_conn()?;
         let tx = conn.transaction()?;
-
-        {
-            let ipv4_network = ipv4_network_address(space.ipv4_prefix, (space.ipv4_prefix_len & 255) as u8);
-            let ipv4_broadcast = ipv4_broadcast_address(space.ipv4_prefix, (space.ipv4_prefix_len & 255) as u8);
-            let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_space_ipv4 
-                WHERE ipv4_prefix >= ? AND ipv4_prefix <= ?"
-            )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    ipv4_network, ipv4_broadcast,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "Overlapping space exists".to_string()));
-            }
-        }
-
-        for i in 0..space.ipv4_prefix_len {
-            let ipv4_network = ipv4_network_address(space.ipv4_prefix, (i & 255) as u8);
-            let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_space_ipv4 
-                WHERE ipv4_prefix = ? AND ipv4_prefix_len = ?"
-            )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    ipv4_network, i,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "Overlapping space exists".to_string()));
-            }
-        }
 
         {
             let mut stmt = tx.prepare(
@@ -124,10 +84,10 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
         Ok(id as i32)
     }
 
-    fn update_space(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_space(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_space_ipv4 SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_space_ipv4 SET name = ?, description = ?, space_visibility = COALESCE(?, space_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 
@@ -222,11 +182,11 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
             let ipv4_broadcast = ipv4_broadcast_address(pool.ipv4_prefix, (pool.ipv4_prefix_len & 255) as u8);
             let mut stmt = tx.prepare(
                 "SELECT COUNT(*) FROM assignment_pool_ipv4 
-                WHERE ipv4_prefix >= ? AND ipv4_prefix <= ?"
+                WHERE assignment_space_id = ? AND ipv4_prefix >= ? AND ipv4_prefix <= ?"
             )?;
             let count: i32 = stmt.query_row(
                 rusqlite::params![
-                    ipv4_network, ipv4_broadcast,
+                    pool.assignment_space_id, ipv4_network, ipv4_broadcast,
                 ],
                 |row| row.get(0)
             )?;
@@ -240,11 +200,11 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
             let ipv4_network = ipv4_network_address(pool.ipv4_prefix, (i & 255) as u8);
             let mut stmt = tx.prepare(
                 "SELECT COUNT(*) FROM assignment_pool_ipv4 
-                WHERE ipv4_prefix = ? AND ipv4_prefix_len = ?"
+                WHERE assignment_space_id = ? AND ipv4_prefix = ? AND ipv4_prefix_len = ?"
             )?;
             let count: i32 = stmt.query_row(
                 rusqlite::params![
-                    ipv4_network, i,
+                    pool.assignment_space_id, ipv4_network, i,
                 ],
                 |row| row.get(0)
             )?;
@@ -270,10 +230,10 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
         Ok(id as i32)
     }
 
-    fn update_pool(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_pool(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_pool_ipv4 SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_pool_ipv4 SET name = ?, description = ?, pool_visibility = COALESCE(?, pool_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 
@@ -368,11 +328,11 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
             let ipv4_broadcast = ipv4_broadcast_address(assignment.ipv4_prefix, (assignment.ipv4_prefix_len & 255) as u8);
             let mut stmt = tx.prepare(
                 "SELECT COUNT(*) FROM assignment_ipv4 
-                WHERE ipv4_prefix >= ? AND ipv4_prefix <= ?"
+                WHERE assignment_pool_id = ? AND ipv4_prefix >= ? AND ipv4_prefix <= ?"
             )?;
             let count: i32 = stmt.query_row(
                 rusqlite::params![
-                    ipv4_network, ipv4_broadcast,
+                    assignment.assignment_pool_id, ipv4_network, ipv4_broadcast,
                 ],
                 |row| row.get(0)
             )?;
@@ -386,11 +346,11 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
             let ipv4_network = ipv4_network_address(assignment.ipv4_prefix, (i & 255) as u8);
             let mut stmt = tx.prepare(
                 "SELECT COUNT(*) FROM assignment_ipv4 
-                WHERE ipv4_prefix = ? AND ipv4_prefix_len = ?"
+                WHERE assignment_pool_id = ? AND ipv4_prefix = ? AND ipv4_prefix_len = ?"
             )?;
             let count: i32 = stmt.query_row(
                 rusqlite::params![
-                    ipv4_network, i,
+                    assignment.assignment_pool_id, ipv4_network, i,
                 ],
                 |row| row.get(0)
             )?;
@@ -416,10 +376,10 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
         Ok(id as i32)
     }
 
-    fn update_assignment(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_assignment(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_ipv4 SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_ipv4 SET name = ?, description = ?, assignment_visibility = COALESCE(?, assignment_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 

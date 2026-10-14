@@ -5,6 +5,9 @@ mod v1_asn;
 mod v1_ipv4;
 mod v1_ipv6;
 
+#[cfg(test)]
+mod tests;
+
 use crate::store::DbConnection;
 
 use super::Server;
@@ -74,6 +77,9 @@ pub struct User {
 pub struct MetadataUpdateRequest {
     pub name: String,
     pub description: String,
+    /// Omit to keep the current visibility.
+    #[serde(default)]
+    pub visibility: Option<crate::types::ObjectVisibility>,
 }
 
 pub fn build_json_response(response: ApiResponse, status: u16) -> Response<Body> {

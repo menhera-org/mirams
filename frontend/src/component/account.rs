@@ -77,7 +77,7 @@ pub fn LoginForm(props: LoginFormProps) -> Element {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
     pub api_token: String,

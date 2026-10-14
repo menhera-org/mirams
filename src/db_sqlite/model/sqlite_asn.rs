@@ -1,6 +1,6 @@
 
 use crate::db_sqlite::SqliteConnection;
-use crate::types::{Error, ErrorKind};
+use crate::types::{Error, ErrorKind, ObjectVisibility};
 
 use crate::asn::AsnAssignmentStore;
 
@@ -72,10 +72,10 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
         Ok(conn.last_insert_rowid() as i32)
     }
 
-    fn update_space(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_space(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_space_asn SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_space_asn SET name = ?, description = ?, space_visibility = COALESCE(?, space_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 
@@ -172,10 +172,10 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
         Ok(id)
     }
 
-    fn update_pool(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_pool(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_pool_asn SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_pool_asn SET name = ?, description = ?, pool_visibility = COALESCE(?, pool_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 
@@ -270,10 +270,10 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
         Ok(id)
     }
 
-    fn update_assignment(&self, id: i32, name: &str, description: &str) -> Result<(), Error> {
+    fn update_assignment(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error> {
         let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("UPDATE assignment_asn SET name = ?, description = ? WHERE id = ?")?;
-        stmt.execute(rusqlite::params![name, description, id])?;
+        let mut stmt = conn.prepare("UPDATE assignment_asn SET name = ?, description = ?, assignment_visibility = COALESCE(?, assignment_visibility) WHERE id = ?")?;
+        stmt.execute(rusqlite::params![name, description, visibility, id])?;
         Ok(())
     }
 

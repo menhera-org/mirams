@@ -126,8 +126,8 @@ pub trait Ipv4AssignmentStore {
     /// ID in input is ignored
     fn create_space(&self, space: &AssignmentSpaceIpv4) -> Result<i32, Error>;
 
-    /// Update metadata for an assignment space
-    fn update_space(&self, id: i32, name: &str, description: &str) -> Result<(), Error>;
+    /// Update metadata and optionally visibility for an assignment space
+    fn update_space(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error>;
 
     /// Delete an assignment space
     /// Also deletes all pools and assignments in the space
@@ -144,8 +144,8 @@ pub trait Ipv4AssignmentStore {
     /// ID in input is ignored
     fn create_pool(&self, pool: &AssignmentPoolIpv4) -> Result<i32, Error>;
 
-    /// Update metadata for an assignment pool
-    fn update_pool(&self, id: i32, name: &str, description: &str) -> Result<(), Error>;
+    /// Update metadata and optionally visibility for an assignment pool
+    fn update_pool(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error>;
 
     /// Delete an assignment pool
     /// Also deletes all assignments in the pool
@@ -162,8 +162,8 @@ pub trait Ipv4AssignmentStore {
     /// ID in input is ignored
     fn create_assignment(&self, assignment: &AssignmentIpv4) -> Result<i32, Error>;
 
-    /// Update metadata for an assignment
-    fn update_assignment(&self, id: i32, name: &str, description: &str) -> Result<(), Error>;
+    /// Update metadata and optionally visibility for an assignment
+    fn update_assignment(&self, id: i32, name: &str, description: &str, visibility: Option<ObjectVisibility>) -> Result<(), Error>;
 
     /// Delete an assignment
     fn delete_assignment(&self, assignment_id: i32) -> Result<(), Error>;

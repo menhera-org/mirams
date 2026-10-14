@@ -1,5 +1,8 @@
 use std::path::Path;
 
+// Keep the build dependency that enables vendored OpenSSL for the dx build.
+use openssl_sys as _;
+
 fn copy_dir(source: &Path, destination: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(destination)?;
     for entry in std::fs::read_dir(source)? {
