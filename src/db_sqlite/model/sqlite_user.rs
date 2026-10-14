@@ -64,10 +64,18 @@ impl SqliteUserStore {
     }
 
     fn update_user(&self, name: &str, hashed_password: &str) -> Result<i32, Error> {
-        let conn = self.db.get_conn()?;
-        let mut stmt = conn.prepare("INSERT OR REPLACE INTO user (name, hashed_password) VALUES (?, ?)")?;
-        let id = stmt.insert(rusqlite::params![name, hashed_password])?;
-        Ok((id & 0x7FFFFFFF) as i32)
+        let mut conn = self.db.get_conn()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let id: i32 = tx.query_row(
+            "INSERT INTO user (name, hashed_password) VALUES (?, ?)
+             ON CONFLICT(name) DO UPDATE SET hashed_password = excluded.hashed_password
+             RETURNING id",
+            rusqlite::params![name, hashed_password],
+            |row| row.get(0),
+        )?;
+        tx.execute("DELETE FROM api_key WHERE user_id = ?", [id])?;
+        tx.commit()?;
+        Ok(id)
     }
 
     /// Update the password for a user. If the user does not exist, it will be created.

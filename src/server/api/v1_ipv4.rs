@@ -31,6 +31,7 @@ use super::ApiResponseVariant;
 use super::ApiResponse;
 use super::MetadataUpdateRequest;
 use super::run_blocking_task;
+use super::{error_status, response_not_found};
 
 use crate::ipv4::{
     AssignmentSpaceIpv4,
@@ -112,7 +113,7 @@ where
                     error: Some(format!("Error creating assignment space: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -191,7 +192,7 @@ where
                     error: Some(format!("Error updating assignment space: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -223,7 +224,7 @@ where
                     error: Some(format!("Error deleting assignment space: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -325,7 +326,7 @@ where
                     error: Some(format!("Error creating pool: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -345,6 +346,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !pool_path_exists(store.clone(), space_id, pool_id).await {
+            return response_not_found();
+        }
 
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_pool(pool_id)).await {
             Ok(pool) => {
@@ -403,6 +407,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !pool_path_exists(store.clone(), space_id, pool_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_pool(pool_id, &req.name, &req.description, req.visibility)).await {
             Ok(_) => {
                 if let Ok(pool) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_pool(pool_id)).await {
@@ -424,7 +431,7 @@ where
                     error: Some(format!("Error updating pool: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -444,6 +451,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !pool_path_exists(store.clone(), space_id, pool_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().delete_pool(pool_id)).await {
             Ok(_) => {
                 let res = ApiResponse {
@@ -457,7 +467,7 @@ where
                     error: Some(format!("Error deleting pool: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -477,6 +487,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !pool_path_exists(store.clone(), space_id, pool_id).await {
+            return response_not_found();
+        }
 
         let pool_id_copy = pool_id;
         if let Ok(pool) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_pool(pool_id_copy)).await {
@@ -558,6 +571,9 @@ where
     }
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !pool_path_exists(store.clone(), space_id, pool_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().create_assignment(&req)).await {
             Ok(assignment_id) => {
                 if let Ok(assignment) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_assignment(assignment_id)).await {
@@ -579,7 +595,7 @@ where
                     error: Some(format!("Error creating assignment: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -599,6 +615,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !assignment_path_exists(store.clone(), space_id, pool_id, assignment_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_assignment(assignment_id)).await {
             Ok(assignment) => {
                 let pool_id = assignment.assignment_pool_id;
@@ -674,6 +693,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !assignment_path_exists(store.clone(), space_id, pool_id, assignment_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().update_assignment(assignment_id, &req.name, &req.description, req.visibility)).await {
             Ok(_) => {
                 if let Ok(assignment) = run_blocking_task(store.clone(), move |store| store.ipv4_assignments().get_assignment(assignment_id)).await {
@@ -695,7 +717,7 @@ where
                     error: Some(format!("Error updating assignment: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -715,6 +737,9 @@ where
 {
     if let Some(ext) = ext {
         let store = ext.0.store();
+        if !assignment_path_exists(store.clone(), space_id, pool_id, assignment_id).await {
+            return response_not_found();
+        }
         let res = match run_blocking_task(store.clone(), move |store| store.ipv4_assignments().delete_assignment(assignment_id)).await {
             Ok(_) => {
                 let res = ApiResponse {
@@ -728,7 +753,7 @@ where
                     error: Some(format!("Error deleting assignment: {}", e)),
                     result: None,
                 };
-                build_json_response(res, 500)
+                build_json_response(res, error_status(&e))
             },
         };
         return res;
@@ -739,6 +764,32 @@ where
         };
         return build_json_response(res, 500);
     }
+}
+
+async fn pool_path_exists<T>(store: crate::Store<T>, space_id: i32, pool_id: i32) -> bool
+where
+    T: DbConnection + Clone + Send + Sync + 'static,
+{
+    run_blocking_task(store, move |store| {
+        let assignments = store.ipv4_assignments();
+        assignments.get_pool(pool_id)
+            .is_ok_and(|pool| pool.assignment_space_id == space_id)
+            && assignments.get_space(space_id).is_ok()
+    }).await
+}
+
+async fn assignment_path_exists<T>(store: crate::Store<T>, space_id: i32, pool_id: i32, assignment_id: i32) -> bool
+where
+    T: DbConnection + Clone + Send + Sync + 'static,
+{
+    run_blocking_task(store, move |store| {
+        let assignments = store.ipv4_assignments();
+        assignments.get_assignment(assignment_id)
+            .is_ok_and(|assignment| assignment.assignment_pool_id == pool_id)
+            && assignments.get_pool(pool_id)
+                .is_ok_and(|pool| pool.assignment_space_id == space_id)
+            && assignments.get_space(space_id).is_ok()
+    }).await
 }
 
 pub fn build_router<T>() -> Router<Server<T>>

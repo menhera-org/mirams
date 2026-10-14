@@ -188,7 +188,8 @@ where
             let mut request = Request::from_parts(parts, body);
     
             let authorization = request.headers().get(AUTHORIZATION)
-                .map(|header| header.to_str().unwrap().trim().to_owned());
+                .and_then(|header| header.to_str().ok())
+                .map(|value| value.trim().to_owned());
 
             if let Some(authorization) = authorization {
                 let parts: Vec<&str> = authorization.split_whitespace().collect();
@@ -220,6 +221,14 @@ where
             Ok(request)
         };
         Box::pin(fut)
+    }
+}
+
+pub(crate) fn error_status(error: &crate::Error) -> u16 {
+    match error.kind() {
+        crate::ErrorKind::InvalidInput => 400,
+        crate::ErrorKind::NotFound => 404,
+        _ => 500,
     }
 }
 

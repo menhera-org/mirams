@@ -65,6 +65,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
     }
 
     fn create_space(&self, space: &crate::ipv4::AssignmentSpaceIpv4) -> Result<i32, Error> {
+        crate::ipv4::validate_prefix(space.ipv4_prefix, space.ipv4_prefix_len)?;
         let mut conn = self.db.get_conn()?;
         let tx = conn.transaction()?;
 
@@ -147,6 +148,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
     }
 
     fn create_pool(&self, pool: &crate::ipv4::AssignmentPoolIpv4) -> Result<i32, Error> {
+        crate::ipv4::validate_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len)?;
         use crate::ipv4::ipv4_network_address;
         use crate::ipv4::ipv4_broadcast_address;
 
@@ -178,39 +180,22 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
         }
 
         {
-            let ipv4_network = ipv4_network_address(pool.ipv4_prefix, (pool.ipv4_prefix_len & 255) as u8);
-            let ipv4_broadcast = ipv4_broadcast_address(pool.ipv4_prefix, (pool.ipv4_prefix_len & 255) as u8);
+            let network = ipv4_network_address(pool.ipv4_prefix, pool.ipv4_prefix_len as u8);
+            let broadcast = ipv4_broadcast_address(pool.ipv4_prefix, pool.ipv4_prefix_len as u8);
             let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_pool_ipv4 
-                WHERE assignment_space_id = ? AND ipv4_prefix >= ? AND ipv4_prefix <= ?"
+                "SELECT ipv4_prefix, ipv4_prefix_len FROM assignment_pool_ipv4 WHERE assignment_space_id = ?"
             )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    pool.assignment_space_id, ipv4_network, ipv4_broadcast,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "Overlapping pool exists".to_string()));
-            }
-        }
-
-        for i in 0..pool.ipv4_prefix_len {
-            let ipv4_network = ipv4_network_address(pool.ipv4_prefix, (i & 255) as u8);
-            let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_pool_ipv4 
-                WHERE assignment_space_id = ? AND ipv4_prefix = ? AND ipv4_prefix_len = ?"
-            )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    pool.assignment_space_id, ipv4_network, i,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "Overlapping pool exists".to_string()));
+            let existing = stmt.query_map([pool.assignment_space_id], |row| {
+                Ok((row.get::<_, crate::ipv4::RawIpv4Addr>(0)?, row.get::<_, u8>(1)?))
+            })?;
+            for prefix in existing {
+                let (prefix, prefix_len) = prefix?;
+                // Normalize old records too: earlier versions accepted host bits.
+                let existing_network = ipv4_network_address(prefix, prefix_len);
+                let existing_broadcast = ipv4_broadcast_address(prefix, prefix_len);
+                if network <= existing_broadcast && existing_network <= broadcast {
+                    return Err(Error::new(ErrorKind::InvalidInput, "Overlapping pool exists"));
+                }
             }
         }
 
@@ -293,6 +278,7 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
     }
 
     fn create_assignment(&self, assignment: &crate::ipv4::AssignmentIpv4) -> Result<i32, Error> {
+        crate::ipv4::validate_prefix(assignment.ipv4_prefix, assignment.ipv4_prefix_len)?;
         use crate::ipv4::ipv4_network_address;
         use crate::ipv4::ipv4_broadcast_address;
 
@@ -324,39 +310,22 @@ impl Ipv4AssignmentStore for SqliteIpv4AssignmentStore {
         }
 
         {
-            let ipv4_network = ipv4_network_address(assignment.ipv4_prefix, (assignment.ipv4_prefix_len & 255) as u8);
-            let ipv4_broadcast = ipv4_broadcast_address(assignment.ipv4_prefix, (assignment.ipv4_prefix_len & 255) as u8);
+            let network = ipv4_network_address(assignment.ipv4_prefix, assignment.ipv4_prefix_len as u8);
+            let broadcast = ipv4_broadcast_address(assignment.ipv4_prefix, assignment.ipv4_prefix_len as u8);
             let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_ipv4 
-                WHERE assignment_pool_id = ? AND ipv4_prefix >= ? AND ipv4_prefix <= ?"
+                "SELECT ipv4_prefix, ipv4_prefix_len FROM assignment_ipv4 WHERE assignment_pool_id = ?"
             )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    assignment.assignment_pool_id, ipv4_network, ipv4_broadcast,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "overlapping assingment exists".to_string()));
-            }
-        }
-
-        for i in 0..assignment.ipv4_prefix_len {
-            let ipv4_network = ipv4_network_address(assignment.ipv4_prefix, (i & 255) as u8);
-            let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM assignment_ipv4 
-                WHERE assignment_pool_id = ? AND ipv4_prefix = ? AND ipv4_prefix_len = ?"
-            )?;
-            let count: i32 = stmt.query_row(
-                rusqlite::params![
-                    assignment.assignment_pool_id, ipv4_network, i,
-                ],
-                |row| row.get(0)
-            )?;
-
-            if count > 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, "Overlapping assignment exists".to_string()));
+            let existing = stmt.query_map([assignment.assignment_pool_id], |row| {
+                Ok((row.get::<_, crate::ipv4::RawIpv4Addr>(0)?, row.get::<_, u8>(1)?))
+            })?;
+            for prefix in existing {
+                let (prefix, prefix_len) = prefix?;
+                // Normalize old records too: earlier versions accepted host bits.
+                let existing_network = ipv4_network_address(prefix, prefix_len);
+                let existing_broadcast = ipv4_broadcast_address(prefix, prefix_len);
+                if network <= existing_broadcast && existing_network <= broadcast {
+                    return Err(Error::new(ErrorKind::InvalidInput, "Overlapping assignment exists"));
+                }
             }
         }
 

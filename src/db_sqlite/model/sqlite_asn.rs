@@ -66,6 +66,9 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
     }
 
     fn create_space(&self, space: &crate::asn::AssignmentSpaceAsn) -> Result<i32, Error> {
+        if space.asn_from > space.asn_to {
+            return Err(Error::new(ErrorKind::InvalidInput, "Invalid ASN range"));
+        }
         let conn = self.db.get_conn()?;
         let mut stmt = conn.prepare("INSERT INTO assignment_space_asn (name, description, space_visibility, asn_from, asn_to) VALUES (?, ?, ?, ?, ?)")?;
         stmt.execute(rusqlite::params![space.name, space.description, space.space_visibility as i32, space.asn_from, space.asn_to])?;
@@ -136,6 +139,9 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
     }
 
     fn create_pool(&self, pool: &crate::asn::AssignmentPoolAsn) -> Result<i32, Error> {
+        if pool.asn_from > pool.asn_to {
+            return Err(Error::new(ErrorKind::InvalidInput, "Invalid ASN range"));
+        }
         let mut conn = self.db.get_conn()?;
         let tx = conn.transaction()?;
 
@@ -153,8 +159,8 @@ impl AsnAssignmentStore for SqliteAsnAssignmentStore {
 
         {
             // Check for overlapping pools
-            let mut check_stmt = tx.prepare("SELECT COUNT(*) FROM assignment_pool_asn WHERE assignment_space_id = ? AND ((asn_from <= ? AND asn_to >= ?) OR (asn_from <= ? AND asn_to >= ?))")?;
-            let count: i32 = check_stmt.query_row(rusqlite::params![pool.assignment_space_id, pool.asn_from, pool.asn_from, pool.asn_to, pool.asn_to], |row| row.get(0))?;
+            let mut check_stmt = tx.prepare("SELECT COUNT(*) FROM assignment_pool_asn WHERE assignment_space_id = ? AND asn_from <= ? AND asn_to >= ?")?;
+            let count: i32 = check_stmt.query_row(rusqlite::params![pool.assignment_space_id, pool.asn_to, pool.asn_from], |row| row.get(0))?;
 
             if count > 0 {
                 return Err(Error::new(ErrorKind::InvalidInput, "Overlapping assignment pool exists".to_string()));

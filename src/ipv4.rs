@@ -41,6 +41,17 @@ pub fn ipv4_broadcast_address(ip: RawIpv4Addr, prefix_len: u8) -> RawIpv4Addr {
     addr
 }
 
+/// Reject invalid lengths and addresses with host bits before doing database work.
+pub(crate) fn validate_prefix(prefix: RawIpv4Addr, prefix_len: i32) -> Result<(), Error> {
+    if !(0..=32).contains(&prefix_len) {
+        return Err(Error::new(crate::ErrorKind::InvalidInput, "Invalid IPV4 prefix length"));
+    }
+    if prefix != ipv4_network_address(prefix, prefix_len as u8) {
+        return Err(Error::new(crate::ErrorKind::InvalidInput, "IPV4 prefix must be a network address"));
+    }
+    Ok(())
+}
+
 /// IPv4 assignment space. Can contain multiple pools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentSpaceIpv4 {

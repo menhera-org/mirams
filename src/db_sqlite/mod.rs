@@ -1,6 +1,9 @@
 
 pub mod model;
 
+#[cfg(test)]
+mod security_tests;
+
 use r2d2_sqlite::rusqlite;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
@@ -17,7 +20,7 @@ pub use crate::types::ObjectVisibility;
 
 
 // Schema versioning
-const SCHEMA_VERSION: i32 = 1;
+const SCHEMA_VERSION: i32 = 2;
 
 
 // Structs for tables
@@ -317,6 +320,19 @@ CREATE INDEX assignment_asn_asn ON assignment_asn (asn);
 "#;
 
 
+// Repair duplicate accounts created by the old password setter, keeping the
+// latest password and revoking every token associated with duplicate names.
+const MIGRATION_2: &str = r#"
+DELETE FROM api_key WHERE user_id IN (
+    SELECT id FROM user WHERE name IN (
+        SELECT name FROM user GROUP BY name HAVING COUNT(*) > 1
+    )
+);
+DELETE FROM user WHERE id NOT IN (SELECT MAX(id) FROM user GROUP BY name);
+DROP INDEX user_name;
+CREATE UNIQUE INDEX user_name ON user (name);
+"#;
+
 // Actual code below
 
 #[derive(Debug, Clone)]
@@ -351,13 +367,17 @@ impl SqliteConnection {
         });
         match version {
             Ok(version) => {
-                if version != SCHEMA_VERSION {
+                if version == 1 {
+                    tx.execute_batch(MIGRATION_2)?;
+                    tx.execute("INSERT INTO schema_version (id, version) VALUES (2, ?)", [SCHEMA_VERSION])?;
+                } else if version != SCHEMA_VERSION {
                     return Err(Error::new(ErrorKind::InternalError, format!("Database schema version mismatch: expected {}, got {}", SCHEMA_VERSION, version)));
                 }
             },
             Err(rusqlite::Error::QueryReturnedNoRows) => {
-                tx.execute("INSERT INTO schema_version (id, version) VALUES (1, ?)", [SCHEMA_VERSION])?;
                 tx.execute_batch(MIGRATION_1)?;
+                tx.execute_batch(MIGRATION_2)?;
+                tx.execute("INSERT INTO schema_version (id, version) VALUES (1, ?)", [SCHEMA_VERSION])?;
             },
             Err(error) => return Err(error.into()),
         }

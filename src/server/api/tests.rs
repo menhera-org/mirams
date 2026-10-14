@@ -260,3 +260,220 @@ async fn overlapping_spaces_have_independent_pools_and_assignments() {
         }
     }
 }
+
+#[tokio::test]
+async fn malformed_authorization_is_handled_without_panicking() {
+    let (app, _) = app();
+    for (path, expected) in [("/ipv4/assignment_space", 200), ("/user/self", 401)] {
+        let req = Request::builder()
+            .uri(path)
+            .header(
+                AUTHORIZATION,
+                http::HeaderValue::from_bytes(b"Bearer \xff").unwrap(),
+            )
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(req).await.unwrap().status().as_u16(),
+            expected
+        );
+    }
+}
+
+#[tokio::test]
+async fn invalid_prefixes_are_rejected_before_allocation_work() {
+    let (app, token) = app();
+    for (family, max_len) in [("ipv4", 32), ("ipv6", 128)] {
+        let root = format!("/{family}/assignment_space");
+        let prefix = format!("{family}_prefix");
+        let length = format!("{family}_prefix_len");
+        for (object, get_path, create_path) in [
+            ("assignment_space", format!("{root}/1"), root.clone()),
+            (
+                "assignment_pool",
+                format!("{root}/1/pool/1"),
+                format!("{root}/1/pool"),
+            ),
+            (
+                "assignment",
+                format!("{root}/1/pool/1/assignment/1"),
+                format!("{root}/1/pool/1/assignment"),
+            ),
+        ] {
+            let (_, body) = request(&app, "GET", &get_path, Value::Null, Some(&token)).await;
+            let original = body[format!("{family}_{object}")].clone();
+            for invalid_len in [-1, max_len + 1, 100_000, i32::MAX] {
+                let mut invalid = original.clone();
+                invalid[&length] = json!(invalid_len);
+                let (status, body) =
+                    request(&app, "POST", &create_path, invalid, Some(&token)).await;
+                assert_eq!(status, 400, "{family} {object} /{invalid_len}: {body}");
+            }
+            let mut invalid = original.clone();
+            // Host bits are invalid for a prefix shorter than the address width.
+            invalid[&length] = json!(max_len - 1);
+            let last = invalid[&prefix].as_array().unwrap().len() - 1;
+            invalid[&prefix][last] = json!(1);
+            assert_eq!(
+                request(&app, "POST", &create_path, invalid, Some(&token))
+                    .await
+                    .0,
+                400
+            );
+        }
+        // Both /0 and single-address spaces are valid; spaces can still overlap.
+        let (_, body) = request(&app, "GET", &format!("{root}/1"), Value::Null, Some(&token)).await;
+        let mut space = body[format!("{family}_assignment_space")].clone();
+        space[&prefix] = json!(vec![0; if family == "ipv4" { 4 } else { 16 }]);
+        for valid_len in [0, max_len] {
+            space[&length] = json!(valid_len);
+            assert_eq!(
+                request(&app, "POST", &root, space.clone(), Some(&token))
+                    .await
+                    .0,
+                200
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn enclosing_asn_pools_are_rejected() {
+    let (app, token) = app();
+    let space = json!({"name":"ASN range", "description":"", "space_visibility":"public", "asn_from":64000, "asn_to":65500});
+    let (_, body) = request(&app, "POST", "/asn/assignment_space", space, Some(&token)).await;
+    let space_id = body["asn_assignment_space"]["id"].as_i64().unwrap();
+    let path = format!("/asn/assignment_space/{space_id}/pool");
+    let mut pool = json!({"name":"Pool", "description":"", "pool_visibility":"public", "assignment_space_id":space_id, "asn_from":65000, "asn_to":65099});
+    assert_eq!(
+        request(&app, "POST", &path, pool.clone(), Some(&token))
+            .await
+            .0,
+        200
+    );
+    for (from, to) in [(64999, 65100), (65020, 65030), (65099, 65100)] {
+        pool["asn_from"] = json!(from);
+        pool["asn_to"] = json!(to);
+        assert_eq!(
+            request(&app, "POST", &path, pool.clone(), Some(&token))
+                .await
+                .0,
+            400
+        );
+    }
+    pool["asn_from"] = json!(65100);
+    pool["asn_to"] = json!(65199);
+    assert_eq!(
+        request(&app, "POST", &path, pool, Some(&token)).await.0,
+        200
+    );
+}
+
+#[tokio::test]
+async fn nested_routes_enforce_all_parent_ids_without_mutating_objects() {
+    let (app, token) = app();
+    for family in ["asn", "ipv4", "ipv6"] {
+        let root = format!("/{family}/assignment_space");
+        let pool_path = format!("{root}/1/pool/1");
+        let assignment_path = format!("{pool_path}/assignment/1");
+        let (_, original_pool) = request(&app, "GET", &pool_path, Value::Null, Some(&token)).await;
+        let (_, original_assignment) =
+            request(&app, "GET", &assignment_path, Value::Null, Some(&token)).await;
+        let (_, space) =
+            request(&app, "GET", &format!("{root}/1"), Value::Null, Some(&token)).await;
+        let (_, created) = request(
+            &app,
+            "POST",
+            &root,
+            space[format!("{family}_assignment_space")].clone(),
+            Some(&token),
+        )
+        .await;
+        let other_space = created[format!("{family}_assignment_space")]["id"]
+            .as_i64()
+            .unwrap();
+        for wrong_space in [other_space, 999] {
+            let wrong_pool_path = format!("{root}/{wrong_space}/pool/1");
+            let wrong_assignment_path = format!("{wrong_pool_path}/assignment/1");
+            for path in [&wrong_pool_path, &wrong_assignment_path] {
+                for method in ["GET", "PUT", "DELETE"] {
+                    let body =
+                        json!({"name":"Wrong parent", "description":"", "visibility":"private"});
+                    assert_eq!(
+                        request(&app, method, path, body, Some(&token)).await.0,
+                        404,
+                        "{method} {path}"
+                    );
+                }
+            }
+            assert_eq!(
+                request(
+                    &app,
+                    "GET",
+                    &format!("{wrong_pool_path}/assignment"),
+                    Value::Null,
+                    Some(&token)
+                )
+                .await
+                .0,
+                404
+            );
+            assert_eq!(
+                request(
+                    &app,
+                    "POST",
+                    &format!("{wrong_pool_path}/assignment"),
+                    original_assignment[format!("{family}_assignment")].clone(),
+                    Some(&token)
+                )
+                .await
+                .0,
+                404
+            );
+        }
+        for method in ["GET", "PUT", "DELETE"] {
+            let path = format!("{root}/1/pool/999/assignment/1");
+            let body = json!({"name":"Wrong pool", "description":"", "visibility":"private"});
+            assert_eq!(
+                request(&app, method, &path, body, Some(&token)).await.0,
+                404
+            );
+        }
+        assert_eq!(
+            request(&app, "GET", &pool_path, Value::Null, Some(&token))
+                .await
+                .1,
+            original_pool
+        );
+        assert_eq!(
+            request(&app, "GET", &assignment_path, Value::Null, Some(&token))
+                .await
+                .1,
+            original_assignment
+        );
+        // Correct paths still work for updates and cascading deletes.
+        let body = json!({"name":"Valid update", "description":"", "visibility":"public"});
+        assert_eq!(
+            request(&app, "PUT", &assignment_path, body.clone(), Some(&token))
+                .await
+                .0,
+            200
+        );
+        assert_eq!(
+            request(&app, "PUT", &pool_path, body, Some(&token)).await.0,
+            200
+        );
+        assert_eq!(
+            request(&app, "DELETE", &pool_path, Value::Null, Some(&token))
+                .await
+                .0,
+            200
+        );
+        assert_eq!(
+            request(&app, "GET", &assignment_path, Value::Null, Some(&token))
+                .await
+                .0,
+            404
+        );
+    }
+}

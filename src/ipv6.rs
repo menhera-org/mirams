@@ -42,6 +42,17 @@ pub fn ipv6_broadcast_address(ip: RawIpv6Addr, prefix_len: u8) -> RawIpv6Addr {
 }
 
 
+/// Reject invalid lengths and addresses with host bits before doing database work.
+pub(crate) fn validate_prefix(prefix: RawIpv6Addr, prefix_len: i32) -> Result<(), Error> {
+    if !(0..=128).contains(&prefix_len) {
+        return Err(Error::new(crate::ErrorKind::InvalidInput, "Invalid IPV6 prefix length"));
+    }
+    if prefix != ipv6_network_address(prefix, prefix_len as u8) {
+        return Err(Error::new(crate::ErrorKind::InvalidInput, "IPV6 prefix must be a network address"));
+    }
+    Ok(())
+}
+
 /// IPv6 assignment space. Can contain multiple pools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentSpaceIpv6 {
