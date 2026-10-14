@@ -210,7 +210,7 @@ fn Home() -> Element {
         div {
             h1 { "MIRAMS" }
             p {
-                "MIRAMS: Menhera.org Internet Resources Assignment Management System"
+                "MIRAMS: Menhera® Internet Resources Assignment Management System"
             }
             h2 { "Assignment Spaces" }
             ul {

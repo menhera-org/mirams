@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0 OR MPL-2.0"
 readme = "README.md"
-authors = ["Menhera.org Developers"]
+authors = ["Menhera Developers"]
 repository = "https://github.com/menhera-org/mirams"
-description = "Menhera.org Internet Resources Assignment Management System (Frontend)"
+description = "Menhera Internet Resources Assignment Management System (Frontend)"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

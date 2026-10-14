@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
-/// MIRAMS: Menhera.org Internet Resources Assignment Management System
+/// MIRAMS: Menhera(R) Internet Resources Assignment Management System
 #[derive(Debug, Parser, Clone)] // requires `derive` feature
 #[command(name = "mirams")]
 #[command(version, about, long_about = None)]
