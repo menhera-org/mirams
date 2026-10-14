@@ -1,6 +1,6 @@
 [package]
 name = "mirams"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "Apache-2.0 OR MPL-2.0"
 readme = "README.md"
@@ -45,6 +45,3 @@ openssl-sys = { version = "0.9", features = ["vendored"] }
 members = [
     "frontend", "proc-macros",
 ]
-
-[package.metadata.docs.rs]
-cargo-args = ["-Z", "bindeps"]
