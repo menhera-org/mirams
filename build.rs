@@ -1,7 +1,4 @@
 
-use dioxus_cli_config::DioxusConfig;
-use dioxus_cli_config::Platform;
-use dioxus_cli::*;
 use std::path::Path;
 
 fn main () {
@@ -19,7 +16,7 @@ fn main () {
         .expect("Cargo did not supply the dx artifact");
 
     let _ = std::process::Command::new(dx)
-        .current_dir("frontend")
+        .current_dir(&bin)
         .args(["build", "--web", "--release", "--skip-assets"])
         .status()
         .expect("failed to run dx");

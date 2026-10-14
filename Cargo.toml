@@ -38,6 +38,7 @@ rand = "0.10"
 
 [build-dependencies]
 dioxus-cli = { version = "0.7", artifact = "bin:dx" }
+openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [workspace]
 members = [
