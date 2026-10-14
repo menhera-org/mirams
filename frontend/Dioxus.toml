@@ -16,7 +16,7 @@ asset_dir = "assets"
 [web.app]
 
 # HTML title tag content
-title = "frontend"
+title = "MIRAMS"
 
 [web.watcher]
 

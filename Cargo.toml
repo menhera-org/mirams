@@ -7,7 +7,7 @@ readme = "README.md"
 authors = ["Menhera.org Developers"]
 repository = "https://github.com/menhera-org/mirams"
 description = "Menhera.org Internet Resources Assignment Management System"
-homepage = "https://github.com/menhera-org/mirams"
+
 include = [
     "/src", "/frontend-dist", "/LICENSE.*", "README.md", "/build.rs"
 ]
@@ -35,9 +35,10 @@ env_logger = "0.11.5"
 syslog = "7.0.0"
 multi_log = "0.1.2"
 rand = "0.10"
+rand_core = { version = "0.6", features = ["getrandom"] }
 
 [build-dependencies]
-dioxus-cli = { version = "0.7", artifact = "bin:dx" }
+dioxus-cli = { version = "0.7.10", artifact = "bin:dx" }
 openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [workspace]

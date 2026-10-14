@@ -4,6 +4,7 @@ pub mod component;
 pub mod fetch;
 pub mod inet;
 
+use crate::dioxus_router::Navigator;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 

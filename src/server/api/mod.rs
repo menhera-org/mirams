@@ -14,6 +14,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::routing::{get, post};
 
+use http::StatusCode;
 use tower_http::auth::{AsyncRequireAuthorizationLayer, AsyncAuthorizeRequest};
 use http::{Request, Response, header::AUTHORIZATION, Method};
 use tower::ServiceBuilder;
@@ -109,7 +110,7 @@ where
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors::Any);
 
-    let timeout = TimeoutLayer::new(Duration::from_secs(30));
+    let timeout = TimeoutLayer::with_status_code(StatusCode::GATEWAY_TIMEOUT, Duration::from_secs(30));
 
     let service = ServiceBuilder::new()
         .layer(cors)
