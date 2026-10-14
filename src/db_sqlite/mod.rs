@@ -49,7 +49,7 @@ impl FromSql for ObjectVisibility {
 }
 
 impl ToSql for ObjectVisibility {
-    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error> {
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         Ok((*self as i64).into())
     }
 }

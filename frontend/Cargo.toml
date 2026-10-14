@@ -7,7 +7,6 @@ readme = "README.md"
 authors = ["Menhera.org Developers"]
 repository = "https://github.com/menhera-org/mirams"
 description = "Menhera.org Internet Resources Assignment Management System (Frontend)"
-homepage = "https://github.com/menhera-org/mirams"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
