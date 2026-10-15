@@ -1,106 +1,37 @@
 #![allow(non_snake_case)]
-
 pub mod component;
 pub mod fetch;
 pub mod inet;
 mod session;
 
-use crate::dioxus_router::Navigator;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
-
+use inet::{ApiResponse, Assignment};
 use serde::{Deserialize, Serialize};
-
-use std::str::FromStr;
 
 pub const GITHUB_LINK: &str = "https://github.com/menhera-org/mirams";
 
 #[derive(Clone, Routable, Debug, PartialEq)]
 pub enum Route {
     #[layout(Wrapper)]
-
-    // Home
-
     #[route("/")]
     Home {},
-
-
-    // Login
-
     #[route("/login/")]
     Login {},
-
-
-    // ASN assignments
-
     #[route("/asn/")]
-    AsnSpaceList {},
-
-    #[route("/asn/space/add/")]
-    AsnSpaceAdd {},
-
-    #[route("/asn/space/:space_id/")]
-    AsnSpace { space_id: i32 },
-
-    #[route("/asn/space/:space_id/pool/add/")]
-    AsnPoolAdd { space_id: i32 },
-
-    #[route("/asn/space/:space_id/pool/:pool_id/")]
-    AsnPool { space_id: i32, pool_id: i32 },
-
-    #[route("/asn/space/:space_id/pool/:pool_id/assignment/add/")]
-    AsnAssignmentAdd { space_id: i32, pool_id: i32 },
-
-    #[route("/asn/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
-    AsnAssignment { space_id: i32, pool_id: i32, assignment_id: i32 },
-
-
-    // IPv4 assignments
-
+    AsnAssignments {},
     #[route("/ipv4/")]
-    Ipv4SpaceList {},
-
-    #[route("/ipv4/space/add/")]
-    Ipv4SpaceAdd {},
-
-    #[route("/ipv4/space/:space_id/")]
-    Ipv4Space { space_id: i32 },
-
-    #[route("/ipv4/space/:space_id/pool/add/")]
-    Ipv4PoolAdd { space_id: i32 },
-
-    #[route("/ipv4/space/:space_id/pool/:pool_id/")]
-    Ipv4Pool { space_id: i32, pool_id: i32 },
-
-    #[route("/ipv4/space/:space_id/pool/:pool_id/assignment/add/")]
-    Ipv4AssignmentAdd { space_id: i32, pool_id: i32 },
-
-    #[route("/ipv4/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
-    Ipv4Assignment { space_id: i32, pool_id: i32, assignment_id: i32 },
-
-
-    // IPv6 assignments
-
+    Ipv4Assignments {},
     #[route("/ipv6/")]
-    Ipv6SpaceList {},
-
-    #[route("/ipv6/space/add/")]
-    Ipv6SpaceAdd {},
-
-    #[route("/ipv6/space/:space_id/")]
-    Ipv6Space { space_id: i32 },
-
-    #[route("/ipv6/space/:space_id/pool/add/")]
-    Ipv6PoolAdd { space_id: i32 },
-
-    #[route("/ipv6/space/:space_id/pool/:pool_id/")]
-    Ipv6Pool { space_id: i32, pool_id: i32 },
-
-    #[route("/ipv6/space/:space_id/pool/:pool_id/assignment/add/")]
-    Ipv6AssignmentAdd { space_id: i32, pool_id: i32 },
-
-    #[route("/ipv6/space/:space_id/pool/:pool_id/assignment/:assignment_id/")]
-    Ipv6Assignment { space_id: i32, pool_id: i32, assignment_id: i32 },
+    Ipv6Assignments {},
+    #[route("/assignments/:resource_type/add/")]
+    RootAssignmentAdd { resource_type: String },
+    #[route("/assignment/:id/")]
+    AssignmentPage { id: i32 },
+    #[route("/assignment/:parent_id/add/")]
+    ChildAssignmentAdd { parent_id: i32 },
+    #[route("/:..segments")]
+    PageNotFound { segments: Vec<String> },
 }
 
 fn main() {
@@ -121,7 +52,7 @@ fn App() -> Element {
 }
 
 pub fn close_drawer() {
-    let mut drawer = use_context::<Signal<component::DrawerState>>();
+    let mut drawer = consume_context::<Signal<component::DrawerState>>();
     drawer.set(component::DrawerState { open: false });
 }
 
@@ -136,7 +67,12 @@ fn Wrapper() -> Element {
     let mut user = use_context::<Signal<Option<component::account::User>>>();
     let signed_in = user().is_some();
 
-    let mut class = if drawer_open { "app-drawer-open" } else { "app-drawer-closed" }.to_string();
+    let mut class = if drawer_open {
+        "app-drawer-open"
+    } else {
+        "app-drawer-closed"
+    }
+    .to_string();
     if signed_in {
         class.push_str(" app-signed-in");
     } else {
@@ -166,7 +102,7 @@ fn Wrapper() -> Element {
                     button {
                         class: "app-drawer-toggle-button app-button material-symbols-outlined",
                         onclick: move |_| {
-                            let mut drawer = use_context::<Signal<component::DrawerState>>();
+                            let mut drawer = consume_context::<Signal<component::DrawerState>>();
                             drawer.set(component::DrawerState { open: !drawer_open });
                         },
                         if drawer_open { "left_panel_close" } else { "left_panel_open" }
@@ -189,7 +125,7 @@ fn Wrapper() -> Element {
             div {
                 id: "app-overlay",
                 onclick: move |_| {
-                    let mut drawer = use_context::<Signal<component::DrawerState>>();
+                    let mut drawer = consume_context::<Signal<component::DrawerState>>();
                     drawer.set(component::DrawerState { open: false });
                 },
             }
@@ -199,54 +135,6 @@ fn Wrapper() -> Element {
                     user.set(None);
                     nav.push(Route::Home {});
                 },
-            }
-        }
-    }
-}
-
-#[component]
-fn Home() -> Element {
-    rsx! {
-        div {
-            h1 { "MIRAMS" }
-            p {
-                "MIRAMS: Menhera® Internet Resources Assignment Management System"
-            }
-            h2 { "Assignment Spaces" }
-            ul {
-                li {
-                    Link {
-                        to: Route::AsnSpaceList {},
-                        "ASN Assignment Spaces"
-                    }
-                }
-                li {
-                    Link {
-                        to: Route::Ipv4SpaceList {},
-                        "IPv4 Assignment Spaces"
-                    }
-                }
-                li {
-                    Link {
-                        to: Route::Ipv6SpaceList {},
-                        "IPv6 Assignment Spaces"
-                    }
-                }
-            }
-            h2 { "About MIRAMS" }
-            p {
-                "MIRAMS is a system for managing the assignment of Internet resources, such as ASNs, IPv4 and IPv6 address space."
-            }
-            p {
-                "MIRAMS is Free Software, and is available on GitHub."
-            }
-            ul {
-                li {
-                    Link {
-                        to: NavigationTarget::<Route>::External(GITHUB_LINK.to_string()),
-                        "GitHub"
-                    }
-                }
             }
         }
     }
@@ -268,12 +156,9 @@ fn Login() -> Element {
         spawn(async move {
             let username = attempt.username.clone();
 
-
             let res: Result<LoginResult, _> = fetch::post("/api/v1/login", &attempt, None).await;
             let res = match res {
-                Ok(res) => {
-                res
-                }
+                Ok(res) => res,
                 Err(_e) => {
                     error.set(Some(format!("Login failed")));
                     return;
@@ -299,2672 +184,422 @@ fn Login() -> Element {
     }
 }
 
-pub fn use_token() -> Option<String> {
-    use_context::<Signal<Option<component::account::User>>>().as_ref().map(|u| u.api_token.clone())
+fn root_route(resource_type: &str) -> Route {
+    match resource_type {
+        "asn" => Route::AsnAssignments {},
+        "ipv4" => Route::Ipv4Assignments {},
+        _ => Route::Ipv6Assignments {},
+    }
+}
+
+fn family_label(resource_type: &str) -> &'static str {
+    match resource_type {
+        "asn" => "ASN",
+        "ipv4" => "IPv4",
+        "ipv6" => "IPv6",
+        _ => "Unknown",
+    }
+}
+
+fn token(user: Signal<Option<component::account::User>>) -> Option<String> {
+    user().map(|user| user.api_token)
+}
+
+fn response(result: Result<ApiResponse, reqwest::Error>) -> Result<ApiResponse, String> {
+    let response = result.map_err(|error| format!("Request failed: {error}"))?;
+    if let Some(error) = &response.error {
+        return Err(error.clone());
+    }
+    Ok(response)
+}
+
+async fn load_assignment(id: i32, token: Option<&str>) -> Result<Assignment, String> {
+    response(fetch::get::<ApiResponse>(&format!("/api/v1/assignment/{id}"), token).await)?
+        .assignment
+        .ok_or_else(|| "Assignment not found".to_string())
+}
+
+async fn load_assignments(url: &str, token: Option<&str>) -> Result<Vec<Assignment>, String> {
+    response(fetch::get::<ApiResponse>(url, token).await)?
+        .assignments
+        .ok_or_else(|| "Assignments could not be loaded".to_string())
+}
+
+fn table_rows(assignments: &[Assignment]) -> Vec<component::table::TableRow> {
+    assignments
+        .iter()
+        .map(|assignment| component::table::TableRow {
+            assignment: assignment.range.label(),
+            name: assignment.name.clone(),
+            description: assignment.description.clone(),
+            visibility: assignment.visibility.to_string(),
+            url: format!("/assignment/{}/", assignment.id),
+        })
+        .collect()
 }
 
 #[component]
-fn AsnSpaceList() -> Element {
-    let token = use_token();
-    let future = use_resource(move || {
-        let token = token.clone();
+fn Home() -> Element {
+    rsx! {
+        h1 { "MIRAMS" }
+        p { "Manage Internet resource assignments. Open an assignment to view or add nested assignments." }
+        ul {
+            li { Link { to: Route::AsnAssignments {}, "ASN Assignments" } }
+            li { Link { to: Route::Ipv4Assignments {}, "IPv4 Assignments" } }
+            li { Link { to: Route::Ipv6Assignments {}, "IPv6 Assignments" } }
+        }
+        p { Link { to: GITHUB_LINK, "Source code on GitHub" } }
+    }
+}
+
+#[component]
+fn AsnAssignments() -> Element {
+    let resource_type = "asn";
+    rsx! { AssignmentList { resource_type } }
+}
+#[component]
+fn Ipv4Assignments() -> Element {
+    let resource_type = "ipv4";
+    rsx! { AssignmentList { resource_type } }
+}
+#[component]
+fn Ipv6Assignments() -> Element {
+    let resource_type = "ipv6";
+    rsx! { AssignmentList { resource_type } }
+}
+
+#[component]
+fn AssignmentList(resource_type: String) -> Element {
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let family = resource_type.clone();
+    let assignments = use_resource(move || {
+        let token = token(user);
+        let family = family.clone();
         async move {
-            let api_res = fetch::get::<inet::ApiResponse>("/api/v1/asn/assignment_space", token.as_deref()).await;
-            match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentSpaces(spaces)) => {
-                            spaces
-                        }
-                        _ => {
-                            vec![]
-                        }
-                    }
-                }
-                Err(_) => {
-                    vec![]
-                }
-            }
+            load_assignments(
+                &format!("/api/v1/assignment?resource_type={family}"),
+                token.as_deref(),
+            )
+            .await
         }
     });
-    match &*future.read_unchecked() {
-        Some(spaces) => {
-            let table_rows = spaces.iter().map(|space| {
-                let assignment = inet::format_asn_range(space.asn_from, space.asn_to);
-                component::table::TableRow {
-                    assignment,
-                    name: space.name.clone(),
-                    description: space.description.clone(),
-                    visibility: space.space_visibility.to_string(),
-                    url: format!("/asn/space/{}/", space.id),
-                }
-            }).collect::<Vec<_>>();
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "ASNs" }
-                h1 { "ASN Assignment Spaces" }
-                component::AddButtonToolbar {
-                    add_button_text: "Add ASN Assignment Space",
-                    add_button_route: Route::AsnSpaceAdd {},
-                }
-                component::table::AssignmentTable { rows: table_rows }
-            }
-        }
-        None => {
-            rsx! {
-                h1 { "ASN Assignment Spaces" }
-                p { "Loading..." }
-            }
+    let title = format!("{} Assignments", family_label(&resource_type));
+    rsx! {
+        h1 { "{title}" }
+        p { "Top-level assignments may overlap. Open an assignment to manage its children." }
+        component::AddButtonToolbar { add_button_text: "Add assignment", add_button_route: Route::RootAssignmentAdd { resource_type } }
+        match &*assignments.read_unchecked() {
+            Some(Ok(assignments)) => rsx! {
+                component::table::AssignmentTable { rows: table_rows(assignments) }
+                if assignments.is_empty() { p { "No assignments yet." } }
+            },
+            Some(Err(error)) => rsx! { p { role: "alert", "{error}" } },
+            None => rsx! { p { "Loading assignments…" } },
         }
     }
 }
 
 #[component]
-fn AsnSpace(space_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
+fn AssignmentPage(id: i32) -> Element {
+    // A keyed fragment gives every assignment its own editor and resources.
+    rsx! {
+        for node_id in [id] {
+            AssignmentDetails { key: "{node_id}", id: node_id }
+        }
+    }
+}
+
+#[component]
+fn AssignmentDetails(id: i32) -> Element {
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let nav = navigator();
+    let mut error = use_signal(|| None::<String>);
+    let mut deleting = use_signal(|| false);
+    let mut data = use_resource(move || {
+        let token = token(user);
         async move {
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pools = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool"), token.as_deref()).await;
-            let pools = match pools {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentPools(pools)) => {
-                            Some(pools)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pools) {
-                (Some(space), Some(pools)) => {
-                    Some((space, pools))
-                }
-                _ => {
-                    None
-                }
-            }
+            let assignment = load_assignment(id, token.as_deref()).await?;
+            let ancestors = load_assignments(
+                &format!("/api/v1/assignment/{id}/ancestors"),
+                token.as_deref(),
+            )
+            .await?;
+            let children = load_assignments(
+                &format!("/api/v1/assignment?parent_id={id}"),
+                token.as_deref(),
+            )
+            .await?;
+            Ok::<_, String>((assignment, ancestors, children))
         }
     });
-    match &*future.read_unchecked() {
-        Some(Some((space, pools))) => {
-            let table_rows = pools.iter().map(|pool| {
-                let assignment = inet::format_asn_range(pool.asn_from, pool.asn_to);
-                component::table::TableRow {
-                    assignment,
-                    name: pool.name.clone(),
-                    description: pool.description.clone(),
-                    visibility: pool.pool_visibility.to_string(),
-                    url: format!("/asn/space/{}/pool/{}/", space_id, pool.id),
-                }
-            }).collect::<Vec<_>>();
-            let assignment = inet::format_asn_range(space.asn_from, space.asn_to);
-            let name = space.name.clone();
-            let description = space.description.clone();
-            let visibility = space.space_visibility;
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "ASNs".to_string(),
-                route: Route::AsnSpaceList {},
+    match &*data.read_unchecked() {
+        None => rsx! { p { "Loading assignment…" } },
+        Some(Err(error)) => rsx! { p { role: "alert", "{error}" } },
+        Some(Ok((assignment, ancestors, children))) => {
+            let family = assignment.range.resource_type();
+            let mut crumbs = vec![component::BreadCrumb {
+                name: format!("{} Assignments", family_label(family)),
+                route: root_route(family),
             }];
+            crumbs.extend(ancestors.iter().map(|ancestor| component::BreadCrumb {
+                name: format!("{} — {}", ancestor.range.label(), ancestor.name),
+                route: Route::AssignmentPage { id: ancestor.id },
+            }));
+            let label = assignment.range.label();
+            let after_delete = assignment
+                .parent_id
+                .map(|id| Route::AssignmentPage { id })
+                .unwrap_or_else(|| root_route(family));
             rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment Space: {assignment}" }
+                component::BreadCrumbs { crumbs, title: label.clone() }
+                h1 { "Assignment: {label}" }
                 component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
+                    name: assignment.name.clone(), description: assignment.description.clone(), visibility: assignment.visibility, error: error(),
                     onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
+                        let token = token(user);
+                        error.set(None);
                         spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
+                            match response(fetch::put::<ApiResponse, _>(&format!("/api/v1/assignment/{id}"), metadata, token.as_deref()).await) {
+                                Ok(_) => data.restart(),
+                                Err(message) => error.set(Some(message)),
                             }
                         });
                     }
                 }
-                component::AddButtonToolbar {
-                    add_button_text: "Add ASN Assignment Pool",
-                    add_button_route: Route::AsnPoolAdd { space_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment space?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::AsnSpaceList {});
-                                    });
-                                },
-                                "Yes"
+                h2 { "Nested assignments" }
+                component::AddButtonToolbar { add_button_text: "Add nested assignment", add_button_route: Route::ChildAssignmentAdd { parent_id: id } }
+                component::table::AssignmentTable { rows: table_rows(children) }
+                if children.is_empty() { p { "No nested assignments." } }
+                if user().is_some() {
+                    MoveAssignmentForm {
+                        assignment: assignment.clone(),
+                        onmoved: move |_| data.restart(),
+                    }
+                    div {
+                        class: "delete-toolbar",
+                        if deleting() {
+                            div {
+                                class: "delete-popup",
+                                p { "Delete this assignment and all its nested assignments?" }
+                                button {
+                                    class: "delete-button",
+                                    onclick: move |_| {
+                                        let token = token(user);
+                                        let nav = nav.clone();
+                                        let destination = after_delete.clone();
+                                        spawn(async move {
+                                            match response(fetch::delete::<ApiResponse>(&format!("/api/v1/assignment/{id}"), token.as_deref()).await) {
+                                                Ok(_) => { nav.replace(destination); },
+                                                Err(message) => error.set(Some(message)),
+                                            }
+                                        });
+                                    },
+                                    "Delete assignment and descendants"
+                                }
+                                button { class: "cancel-button", onclick: move |_| deleting.set(false), "Cancel" }
                             }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Space"
+                        } else {
+                            button { class: "delete-button", onclick: move |_| deleting.set(true), "Delete assignment" }
                         }
                     }
                 }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Space" }
-                p { "Loading..." }
             }
         }
     }
 }
 
+#[derive(Serialize)]
+struct MoveRequest {
+    parent_id: Option<i32>,
+}
+
 #[component]
-fn AsnPool(space_id: i32, pool_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
+fn MoveAssignmentForm(assignment: Assignment, onmoved: EventHandler<()>) -> Element {
+    let id = assignment.id;
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let mut destination = use_signal(|| {
+        assignment
+            .parent_id
+            .map(|id| id.to_string())
+            .unwrap_or_default()
+    });
+    let mut error = use_signal(|| None::<String>);
+    let mut saving = use_signal(|| false);
+    let mut destinations = use_resource(move || {
+        let token = token(user);
         async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let assignments = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment"), token.as_deref()).await;
-            let assignments = match assignments {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignments(assignments)) => {
-                            Some(assignments)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignments) {
-                (Some(space), Some(pool), Some(assignments)) => {
-                    Some((space, pool, assignments))
-                }
-                _ => {
-                    None
-                }
-            }
+            load_assignments(
+                &format!("/api/v1/assignment/{id}/move-targets"),
+                token.as_deref(),
+            )
+            .await
         }
     });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignments))) => {
-            let table_rows = assignments.iter().map(|assignment_obj| {
-                let assignment = inet::format_asn_range(assignment_obj.asn, assignment_obj.asn);
-                component::table::TableRow {
-                    assignment,
-                    name: assignment_obj.name.clone(),
-                    description: assignment_obj.description.clone(),
-                    visibility: assignment_obj.assignment_visibility.to_string(),
-                    url: format!("/asn/space/{}/pool/{}/assignment/{}/", space_id, pool_id, assignment_obj.id),
-                }
-            }).collect::<Vec<_>>();
-            let name = pool.name.clone();
-            let description = pool.description.clone();
-            let visibility = pool.pool_visibility;
-            let space = inet::format_asn_range(space.asn_from, space.asn_to);
-            let pool = inet::format_asn_range(pool.asn_from, pool.asn_to);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "ASNs".to_string(),
-                route: Route::AsnSpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::AsnSpace { space_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{pool}" }
-                h1 { "Assignment Pool: {pool}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                component::AddButtonToolbar {
-                    add_button_text: "Add ASN Assignment",
-                    add_button_route: Route::AsnAssignmentAdd { space_id, pool_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment pool?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::AsnSpace { space_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Pool"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Pool" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn AsnAssignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pool = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match pool {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-            let assignment = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::AsnAssignment(assignment)) => {
-                            Some(assignment)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignment) {
-                (Some(space), Some(pool), Some(assignment)) => {
-                    Some((space, pool, assignment))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignment))) => {
-            let name = assignment.name.clone();
-            let description = assignment.description.clone();
-            let visibility = assignment.assignment_visibility;
-            let space = inet::format_asn_range(space.asn_from, space.asn_to);
-            let pool = inet::format_asn_range(pool.asn_from, pool.asn_to);
-            let assignment = inet::format_asn_range(assignment.asn, assignment.asn);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "ASNs".to_string(),
-                route: Route::AsnSpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::AsnSpace { space_id },
-            }, component::BreadCrumb {
-                name: pool.clone(),
-                route: Route::AsnPool { space_id, pool_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment: {assignment}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::AsnPool { space_id, pool_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv4SpaceList() -> Element {
-    let token = use_token();
-    let future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let api_res = fetch::get::<inet::ApiResponse>("/api/v1/ipv4/assignment_space", token.as_deref()).await;
-            match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentSpaces(spaces)) => {
-                            spaces
-                        }
-                        _ => {
-                            vec![]
-                        }
-                    }
-                }
-                Err(_) => {
-                    vec![]
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(spaces) => {
-            let table_rows = spaces.iter().map(|space| {
-                let prefix = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
-                component::table::TableRow {
-                    assignment: prefix,
-                    name: space.name.clone(),
-                    description: space.description.clone(),
-                    visibility: space.space_visibility.to_string(),
-                    url: format!("/ipv4/space/{}/", space.id),
-                }
-            }).collect::<Vec<_>>();
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "IPv4" }
-                h1 { "IPv4 Assignment Spaces" }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv4 Assignment Space",
-                    add_button_route: Route::Ipv4SpaceAdd {},
-                }
-                component::table::AssignmentTable { rows: table_rows }
-            }
-        }
-        None => {
-            rsx! {
-                h1 { "IPv4 Assignment Spaces" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv4Space(space_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pools = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool"), token.as_deref()).await;
-            let pools = match pools {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentPools(pools)) => {
-                            Some(pools)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pools) {
-                (Some(space), Some(pools)) => {
-                    Some((space, pools))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pools))) => {
-            let table_rows = pools.iter().map(|pool| {
-                let assignment = inet::format_ipv4_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len);
-                component::table::TableRow {
-                    assignment,
-                    name: pool.name.clone(),
-                    description: pool.description.clone(),
-                    visibility: pool.pool_visibility.to_string(),
-                    url: format!("/ipv4/space/{}/pool/{}/", space_id, pool.id),
-                }
-            }).collect::<Vec<_>>();
-            let assignment = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
-            let name = space.name.clone();
-            let description = space.description.clone();
-            let visibility = space.space_visibility;
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv4".to_string(),
-                route: Route::Ipv4SpaceList {},
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment Space: {assignment}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv4 Assignment Pool",
-                    add_button_route: Route::Ipv4PoolAdd { space_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment space?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv4SpaceList {});
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Space"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Space" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv4Pool(space_id: i32, pool_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let assignments = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment"), token.as_deref()).await;
-            let assignments = match assignments {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4Assignments(assignments)) => {
-                            Some(assignments)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignments) {
-                (Some(space), Some(pool), Some(assignments)) => {
-                    Some((space, pool, assignments))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignments))) => {
-            let table_rows = assignments.iter().map(|assignment_obj| {
-                let assignment = inet::format_ipv4_prefix(assignment_obj.ipv4_prefix, assignment_obj.ipv4_prefix_len);
-                component::table::TableRow {
-                    assignment,
-                    name: assignment_obj.name.clone(),
-                    description: assignment_obj.description.clone(),
-                    visibility: assignment_obj.assignment_visibility.to_string(),
-                    url: format!("/ipv4/space/{}/pool/{}/assignment/{}/", space_id, pool_id, assignment_obj.id),
-                }
-            }).collect::<Vec<_>>();
-            let name = pool.name.clone();
-            let description = pool.description.clone();
-            let visibility = pool.pool_visibility;
-            let space = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
-            let pool = inet::format_ipv4_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv4".to_string(),
-                route: Route::Ipv4SpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::Ipv4Space { space_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{pool}" }
-                h1 { "Assignment Pool: {pool}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv4 Assignment",
-                    add_button_route: Route::Ipv4AssignmentAdd { space_id, pool_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment pool?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv4Space { space_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Pool"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Pool" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv4Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pool = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match pool {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4AssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-            let assignment = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv4Assignment(assignment)) => {
-                            Some(assignment)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignment) {
-                (Some(space), Some(pool), Some(assignment)) => {
-                    Some((space, pool, assignment))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignment))) => {
-            let name = assignment.name.clone();
-            let description = assignment.description.clone();
-            let visibility = assignment.assignment_visibility;
-            let space = inet::format_ipv4_prefix(space.ipv4_prefix, space.ipv4_prefix_len);
-            let pool = inet::format_ipv4_prefix(pool.ipv4_prefix, pool.ipv4_prefix_len);
-            let assignment = inet::format_ipv4_prefix(assignment.ipv4_prefix, assignment.ipv4_prefix_len);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv4".to_string(),
-                route: Route::Ipv4SpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::Ipv4Space { space_id },
-            }, component::BreadCrumb {
-                name: pool.clone(),
-                route: Route::Ipv4Pool { space_id, pool_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment: {assignment}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv4Pool { space_id, pool_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6SpaceList() -> Element {
-    let token = use_token();
-    let future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let api_res = fetch::get::<inet::ApiResponse>("/api/v1/ipv6/assignment_space", token.as_deref()).await;
-            match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentSpaces(spaces)) => {
-                            spaces
-                        }
-                        _ => {
-                            vec![]
-                        }
-                    }
-                }
-                Err(_) => {
-                    vec![]
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(spaces) => {
-            let table_rows = spaces.iter().map(|space| {
-                let prefix = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
-                component::table::TableRow {
-                    assignment: prefix,
-                    name: space.name.clone(),
-                    description: space.description.clone(),
-                    visibility: space.space_visibility.to_string(),
-                    url: format!("/ipv6/space/{}/", space.id),
-                }
-            }).collect::<Vec<_>>();
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "IPv6" }
-                h1 { "IPv6 Assignment Spaces" }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv6 Assignment Space",
-                    add_button_route: Route::Ipv6SpaceAdd {},
-                }
-                component::table::AssignmentTable { rows: table_rows }
-            }
-        }
-        None => {
-            rsx! {
-                h1 { "IPv6 Assignment Spaces" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6Space(space_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pools = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool"), token.as_deref()).await;
-            let pools = match pools {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentPools(pools)) => {
-                            Some(pools)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pools) {
-                (Some(space), Some(pools)) => {
-                    Some((space, pools))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pools))) => {
-            let table_rows = pools.iter().map(|pool| {
-                let assignment = inet::format_ipv6_prefix(pool.ipv6_prefix, pool.ipv6_prefix_len);
-                component::table::TableRow {
-                    assignment,
-                    name: pool.name.clone(),
-                    description: pool.description.clone(),
-                    visibility: pool.pool_visibility.to_string(),
-                    url: format!("/ipv6/space/{}/pool/{}/", space_id, pool.id),
-                }
-            }).collect::<Vec<_>>();
-            let assignment = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
-            let name = space.name.clone();
-            let description = space.description.clone();
-            let visibility = space.space_visibility;
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv6".to_string(),
-                route: Route::Ipv6SpaceList {},
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment Space: {assignment}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv6 Assignment Pool",
-                    add_button_route: Route::Ipv6PoolAdd { space_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment space?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv6SpaceList {});
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Space"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Space" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6Pool(space_id: i32, pool_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let assignments = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment"), token.as_deref()).await;
-            let assignments = match assignments {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6Assignments(assignments)) => {
-                            Some(assignments)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignments) {
-                (Some(space), Some(pool), Some(assignments)) => {
-                    Some((space, pool, assignments))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignments))) => {
-            let table_rows = assignments.iter().map(|assignment_obj| {
-                let assignment = inet::format_ipv6_prefix(assignment_obj.ipv6_prefix, assignment_obj.ipv6_prefix_len);
-                component::table::TableRow {
-                    assignment,
-                    name: assignment_obj.name.clone(),
-                    description: assignment_obj.description.clone(),
-                    visibility: assignment_obj.assignment_visibility.to_string(),
-                    url: format!("/ipv6/space/{}/pool/{}/assignment/{}/", space_id, pool_id, assignment_obj.id),
-                }
-            }).collect::<Vec<_>>();
-            let name = pool.name.clone();
-            let description = pool.description.clone();
-            let visibility = pool.pool_visibility;
-            let space = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
-            let pool = inet::format_ipv6_prefix(pool.ipv6_prefix, pool.ipv6_prefix_len);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv6".to_string(),
-                route: Route::Ipv6SpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::Ipv6Space { space_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{pool}" }
-                h1 { "Assignment Pool: {pool}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                component::AddButtonToolbar {
-                    add_button_text: "Add IPv6 Assignment",
-                    add_button_route: Route::Ipv6AssignmentAdd { space_id, pool_id },
-                }
-                component::table::AssignmentTable { rows: table_rows }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment pool?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv6Space { space_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment Pool"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment Pool" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6Assignment(space_id: i32, pool_id: i32, assignment_id: i32) -> Element {
-    let current_user = use_context::<Signal<Option<component::account::User>>>();
-    let token = current_user().map(|user| user.api_token);
-    let mut save_error = use_signal(|| None::<String>);
-    let mut delete_popup_shown = use_signal(|| false);
-    let mut future = use_resource(move || {
-        let token = token.clone();
-        async move {
-            let space = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}"), token.as_deref()).await;
-            let space = match space {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentSpace(space)) => {
-                            Some(space)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let pool = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}"), token.as_deref()).await;
-            let pool = match pool {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6AssignmentPool(pool)) => {
-                            Some(pool)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            let api_res = fetch::get::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-            let assignment = match api_res {
-                Ok(api_res) => {
-                    match api_res.result {
-                        Some(inet::ApiResponseVariant::Ipv6Assignment(assignment)) => {
-                            Some(assignment)
-                        }
-                        _ => {
-                            None
-                        }
-                    }
-                }
-                Err(_) => {
-                    None
-                }
-            };
-            match (space, pool, assignment) {
-                (Some(space), Some(pool), Some(assignment)) => {
-                    Some((space, pool, assignment))
-                }
-                _ => {
-                    None
-                }
-            }
-        }
-    });
-    match &*future.read_unchecked() {
-        Some(Some((space, pool, assignment))) => {
-            let name = assignment.name.clone();
-            let description = assignment.description.clone();
-            let visibility = assignment.assignment_visibility;
-            let space = inet::format_ipv6_prefix(space.ipv6_prefix, space.ipv6_prefix_len);
-            let pool = inet::format_ipv6_prefix(pool.ipv6_prefix, pool.ipv6_prefix_len);
-            let assignment = inet::format_ipv6_prefix(assignment.ipv6_prefix, assignment.ipv6_prefix_len);
-            let crumbs = vec![component::BreadCrumb {
-                name: "Home".to_string(),
-                route: Route::Home {},
-            }, component::BreadCrumb {
-                name: "IPv6".to_string(),
-                route: Route::Ipv6SpaceList {},
-            }, component::BreadCrumb {
-                name: space.clone(),
-                route: Route::Ipv6Space { space_id },
-            }, component::BreadCrumb {
-                name: pool.clone(),
-                route: Route::Ipv6Pool { space_id, pool_id },
-            }];
-            rsx! {
-                component::BreadCrumbs { crumbs, title: "{assignment}" }
-                h1 { "Assignment: {assignment}" }
-                component::MetadataForm {
-                    name: name.clone(),
-                    description: description.clone(),
-                    visibility,
-                    error: save_error(),
-                    onsubmit: move |metadata| {
-                        let token = current_user().map(|user| user.api_token);
-                        save_error.set(None);
-                        spawn(async move {
-                            match fetch::put::<inet::ApiResponse, component::MetadataUpdateRequest>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), metadata, token.as_deref()).await {
-                                Ok(response) if response.error.is_none() => future.restart(),
-                                Ok(response) => save_error.set(response.error),
-                                Err(error) => save_error.set(Some(format!("Error saving changes: {error}"))),
-                            }
-                        });
-                    }
-                }
-                div {
-                    class: "delete-toolbar",
-                    if delete_popup_shown() {
-                        div {
-                            class: "delete-popup",
-                            p { "Are you sure you want to delete this assignment?" }
-                            button {
-                                class: "delete-button",
-                                onclick: move |_| {
-                                    let token = use_token();
-                                    spawn(async move {
-                                        let _ = fetch::delete::<inet::ApiResponse>(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment/{assignment_id}"), token.as_deref()).await;
-                                        let nav = use_context::<Navigator>();
-                                        nav.replace(Route::Ipv6Pool { space_id, pool_id });
-                                    });
-                                },
-                                "Yes"
-                            }
-                            button {
-                                class: "cancel-button",
-                                onclick: move |_| {
-                                    delete_popup_shown.set(false);
-                                },
-                                "No"
-                            }
-                        }
-                    } else {
-                        button {
-                            class: "delete-button",
-                            onclick: move |_| {
-                                delete_popup_shown.set(true);
-                            },
-                            "Delete Assignment"
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                h1 { "Assignment" }
-                p { "Loading..." }
-            }
-        }
-    }
-}
-
-#[component]
-fn AsnSpaceAdd() -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut asn_from = use_signal(|| String::new());
-    let mut asn_to = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_space = move |_| {
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let mut asn_from = asn_from().trim().to_owned();
-        let mut asn_to = asn_to().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || asn_from.is_empty() || asn_to.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        if asn_from.starts_with("AS") {
-            asn_from = asn_from[2..].to_string();
-        }
-
-        if asn_to.starts_with("AS") {
-            asn_to = asn_to[2..].to_string();
-        }
-
-        let asn_from: u32 = match asn_from.parse() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid ASN from value".to_string()));
-                return;
-            }
-        };
-
-        let asn_to: u32 = match asn_to.parse() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid ASN to value".to_string()));
-                return;
-            }
-        };
-
-        if asn_from > asn_to {
-            error.set(Some("ASN from must be less than ASN to".to_string()));
-            return;
-        }
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_space = inet::AssignmentSpaceAsn {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            asn_from,
-            asn_to,
-            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/asn/assignment_space", &new_space, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::AsnSpaceList {});
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add ASN space".to_string()));
-                }
-            }
-        });
-    };
-
     rsx! {
-        div {
-            h1 { "Add ASN Assignment Space" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
+        section {
+            class: "move-assignment-form",
+            h2 { "Move assignment" }
+            p { "Nested assignments move with this assignment. Only destinations that can contain its range are shown." }
+            match &*destinations.read_unchecked() {
+                Some(Ok(targets)) => rsx! {
+                    label {
+                        class: "select-label",
+                        "Destination",
+                        select {
+                            value: destination(), disabled: saving(), oninput: move |event| destination.set(event.value()),
+                            option { value: "", "Top level" }
+                            for target in targets {
+                                option { value: "{target.id}", "{target.range.label()} — {target.name}" }
+                            }
+                        }
+                    }
+                    button {
+                        disabled: saving(),
+                        onclick: move |_| {
+                            let parent_id = if destination().is_empty() { None } else { destination().parse::<i32>().ok() };
+                            let token = token(user);
+                            error.set(None);
+                            saving.set(true);
+                            spawn(async move {
+                                match response(fetch::post::<ApiResponse, _>(&format!("/api/v1/assignment/{id}/move"), MoveRequest { parent_id }, token.as_deref()).await) {
+                                    Ok(_) => { destinations.restart(); onmoved.call(()); },
+                                    Err(message) => error.set(Some(message)),
+                                }
+                                saving.set(false);
+                            });
+                        },
+                        if saving() { "Moving…" } else { "Move assignment" }
+                    }
+                },
+                Some(Err(error)) => rsx! { p { role: "alert", "{error}" } },
+                None => rsx! { p { "Loading destinations…" } },
             }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "ASN From",
-                value: "{asn_from}",
-                oninput: move |e: Event<FormData>| asn_from.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "ASN To",
-                value: "{asn_to}",
-                oninput: move |e: Event<FormData>| asn_to.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_space,
-                "Add ASN Space"
-            }
+            if let Some(error) = error() { p { role: "alert", "{error}" } }
         }
     }
 }
 
 #[component]
-fn AsnPoolAdd(space_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut asn_from = use_signal(|| String::new());
-    let mut asn_to = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_pool = move |_| {
-        let space_id = space_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let mut asn_from = asn_from().trim().to_owned();
-        let mut asn_to = asn_to().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || asn_from.is_empty() || asn_to.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        if asn_from.starts_with("AS") {
-            asn_from = asn_from[2..].to_string();
-        }
-
-        if asn_to.starts_with("AS") {
-            asn_to = asn_to[2..].to_string();
-        }
-
-        let asn_from: u32 = match asn_from.parse() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid ASN from value".to_string()));
-                return;
-            }
-        };
-
-        let asn_to: u32 = match asn_to.parse() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid ASN to value".to_string()));
-                return;
-            }
-        };
-
-        if asn_from > asn_to {
-            error.set(Some("ASN from must be less than ASN to".to_string()));
-            return;
-        }
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_pool = inet::AssignmentPoolAsn {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            asn_from,
-            asn_to,
-            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_space_id: space_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/asn/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::AsnSpace { space_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add ASN pool".to_string()));
-                }
-            }
-        });
-    };
-
+fn RootAssignmentAdd(resource_type: String) -> Element {
     rsx! {
-        div {
-            h1 { "Add ASN Assignment Pool" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "ASN From",
-                value: "{asn_from}",
-                oninput: move |e: Event<FormData>| asn_from.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "ASN To",
-                value: "{asn_to}",
-                oninput: move |e: Event<FormData>| asn_to.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_pool,
-                "Add ASN Pool"
-            }
+        for family in [resource_type] {
+            AssignmentForm { key: "root-{family}", resource_type: family, parent: None }
         }
     }
 }
 
 #[component]
-fn AsnAssignmentAdd(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut asn = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_assignment = move |_| {
-        let space_id = space_id;
-        let pool_id = pool_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let mut asn = asn().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || asn.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        if asn.starts_with("AS") {
-            asn = asn[2..].to_string();
-        }
-
-        let asn: u32 = match asn.parse() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid ASN value".to_string()));
-                return;
-            }
-        };
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_assignment = inet::AssignmentAsn {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            asn,
-            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_pool_id: pool_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/asn/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::AsnPool { space_id, pool_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add ASN assignment".to_string()));
-                }
-            }
-        });
-    };
-
+fn ChildAssignmentAdd(parent_id: i32) -> Element {
     rsx! {
-        div {
-            h1 { "Add ASN Assignment" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "ASN",
-                value: "{asn}",
-                oninput: move |e: Event<FormData>| asn.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_assignment,
-                "Add ASN Assignment"
-            }
+        for id in [parent_id] {
+            ChildAssignmentAddInner { key: "{id}", parent_id: id }
         }
     }
 }
 
 #[component]
-fn Ipv4SpaceAdd() -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv4_prefix = use_signal(|| String::new());
-    let mut ipv4_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_space = move |_| {
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv4_prefix = ipv4_prefix().trim().to_owned();
-        let ipv4_prefix_len = ipv4_prefix_len().trim().to_owned();
-
-        if name.is_empty() || ipv4_prefix.is_empty() || ipv4_prefix_len.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
+fn ChildAssignmentAddInner(parent_id: i32) -> Element {
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let parent = use_resource(move || {
+        let token = token(user);
+        async move { load_assignment(parent_id, token.as_deref()).await }
+    });
+    match &*parent.read_unchecked() {
+        Some(Ok(parent)) => {
+            rsx! { AssignmentForm { resource_type: parent.range.resource_type(), parent: Some(parent.clone()) } }
         }
+        Some(Err(error)) => rsx! { p { role: "alert", "{error}" } },
+        None => rsx! { p { "Loading parent assignment…" } },
+    }
+}
 
-        let ipv4_prefix_len = match ipv4_prefix_len.parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv4 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
-        let (ipv4_prefix, ipv4_prefix_len) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = visibility().clone();
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_space = inet::AssignmentSpaceIpv4 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv4_prefix,
-            ipv4_prefix_len,
-            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/ipv4/assignment_space", &new_space, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv4SpaceList {});
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv4 space".to_string()));
-                }
-            }
-        });
+#[component]
+fn AssignmentForm(resource_type: String, parent: Option<Assignment>) -> Element {
+    let user = use_context::<Signal<Option<component::account::User>>>();
+    let nav = navigator();
+    let parent_id = parent.as_ref().map(|parent| parent.id);
+    let defaults = parent
+        .as_ref()
+        .map(|parent| parent.range.fields())
+        .unwrap_or_default();
+    let mut name = use_signal(String::new);
+    let mut description = use_signal(String::new);
+    let mut first = use_signal(|| defaults.0);
+    let mut second = use_signal(|| defaults.1);
+    let mut visibility = use_signal(|| inet::ObjectVisibility::Public);
+    let mut error = use_signal(|| None::<String>);
+    let mut saving = use_signal(|| false);
+    let first_label = if resource_type == "asn" {
+        "Start ASN"
+    } else {
+        "Network address"
     };
-
+    let second_label = if resource_type == "asn" {
+        "End ASN"
+    } else {
+        "Prefix length"
+    };
+    let family = family_label(&resource_type);
+    if !["asn", "ipv4", "ipv6"].contains(&resource_type.as_str()) {
+        return rsx! { p { role: "alert", "Unknown resource type." } };
+    }
+    if user().is_none() {
+        return rsx! { p { "Sign in to create assignments." } Link { to: Route::Login {}, "Sign in" } };
+    }
     rsx! {
-        div {
-            h1 { "Add IPv4 Assignment Space" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
+        h1 { "Add {family} assignment" }
+        if let Some(parent) = parent {
+            p { "Within " Link { to: Route::AssignmentPage { id: parent.id }, "{parent.range.label()} — {parent.name}" } }
+        } else { p { "This is a top-level assignment. Top-level ranges may overlap." } }
+        if let Some(error) = error() { p { role: "alert", "{error}" } }
+        component::TextInput { placeholder: "Name", value: name(), oninput: move |event: Event<FormData>| name.set(event.value()) }
+        component::TextInput { placeholder: "Description", value: description(), oninput: move |event: Event<FormData>| description.set(event.value()) }
+        component::TextInput { placeholder: first_label, value: first(), oninput: move |event: Event<FormData>| first.set(event.value()) }
+        component::TextInput { placeholder: second_label, value: second(), oninput: move |event: Event<FormData>| second.set(event.value()) }
+        label {
+            class: "select-label",
+            "Visibility",
+            select {
+                value: visibility().to_string(), oninput: move |event| visibility.set(if event.value() == "Private" { inet::ObjectVisibility::Private } else { inet::ObjectVisibility::Public }),
+                option { value: "Public", "Public" }
+                option { value: "Private", "Private" }
             }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix",
-                value: "{ipv4_prefix}",
-                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix Length",
-                value: "{ipv4_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_space,
-                "Add IPv4 Space"
-            }
+        }
+        button {
+            disabled: saving(),
+            onclick: move |_| {
+                error.set(None);
+                let range = match inet::AssignmentRange::from_fields(&resource_type, &first(), &second()) {
+                    Ok(range) => range,
+                    Err(message) => { error.set(Some(message)); return; }
+                };
+                if name().trim().is_empty() { error.set(Some("Enter a name for this assignment".into())); return; }
+                let assignment = Assignment { id: 0, parent_id, name: name().trim().to_owned(), description: description().trim().to_owned(), visibility: visibility(), range };
+                let token = token(user);
+                let nav = nav.clone();
+                saving.set(true);
+                spawn(async move {
+                    match response(fetch::post::<ApiResponse, _>("/api/v1/assignment", assignment, token.as_deref()).await) {
+                        Ok(response) => match response.assignment {
+                            Some(assignment) => { nav.replace(Route::AssignmentPage { id: assignment.id }); },
+                            None => error.set(Some("The server did not return the new assignment".into())),
+                        },
+                        Err(message) => error.set(Some(message)),
+                    }
+                    saving.set(false);
+                });
+            },
+            if saving() { "Creating…" } else { "Create assignment" }
         }
     }
 }
 
 #[component]
-fn Ipv4PoolAdd(space_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv4_prefix = use_signal(|| String::new());
-    let mut ipv4_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_pool = move |_| {
-        let space_id = space_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv4_prefix = ipv4_prefix().trim().to_owned();
-        let ipv4_prefix_len = ipv4_prefix_len().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || ipv4_prefix.is_empty() || ipv4_prefix_len.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        let ipv4_prefix_len = match ipv4_prefix_len.parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv4 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
-        let (ipv4_prefix, ipv4_prefix_len) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_pool = inet::AssignmentPoolIpv4 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv4_prefix,
-            ipv4_prefix_len,
-            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_space_id: space_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv4Space { space_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv4 pool".to_string()));
-                }
-            }
-        });
-    };
-
+fn PageNotFound(segments: Vec<String>) -> Element {
+    let path = format!("/{}", segments.join("/"));
     rsx! {
-        div {
-            h1 { "Add IPv4 Assignment Pool" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix",
-                value: "{ipv4_prefix}",
-                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix Length",
-                value: "{ipv4_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_pool,
-                "Add IPv4 Pool"
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv4AssignmentAdd(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv4_prefix = use_signal(|| String::new());
-    let mut ipv4_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_assignment = move |_| {
-        let space_id = space_id;
-        let pool_id = pool_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv4_prefix = ipv4_prefix().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || ipv4_prefix.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        let ipv4_prefix_len = match ipv4_prefix_len().parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv4 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv4Prefix::new(&ipv4_prefix, ipv4_prefix_len);
-        let (ipv4_prefix, _) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_assignment = inet::AssignmentIpv4 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv4_prefix,
-            ipv4_prefix_len,
-            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_pool_id: pool_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv4/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv4Pool { space_id, pool_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv4 assignment".to_string()));
-                }
-            }
-        });
-    };
-
-    rsx! {
-        div {
-            h1 { "Add IPv4 Assignment" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix",
-                value: "{ipv4_prefix}",
-                oninput: move |e: Event<FormData>| ipv4_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv4 Prefix Length",
-                value: "{ipv4_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv4_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_assignment,
-                "Add IPv4 Assignment"
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6SpaceAdd() -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv6_prefix = use_signal(|| String::new());
-    let mut ipv6_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_space = move |_| {
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv6_prefix = ipv6_prefix().trim().to_owned();
-        let ipv6_prefix_len = ipv6_prefix_len().trim().to_owned();
-
-        if name.is_empty() || ipv6_prefix.is_empty() || ipv6_prefix_len.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        let ipv6_prefix_len = match ipv6_prefix_len.parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv6 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
-        let (ipv6_prefix, ipv6_prefix_len) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = visibility().clone();
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_space = inet::AssignmentSpaceIpv6 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv6_prefix,
-            ipv6_prefix_len,
-            space_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post("/api/v1/ipv6/assignment_space", &new_space, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv6SpaceList {});
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv6 space".to_string()));
-                }
-            }
-        });
-    };
-
-    rsx! {
-        div {
-            h1 { "Add IPv6 Assignment Space" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix",
-                value: "{ipv6_prefix}",
-                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix Length",
-                value: "{ipv6_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_space,
-                "Add IPv6 Space"
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6PoolAdd(space_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv6_prefix = use_signal(|| String::new());
-    let mut ipv6_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_pool = move |_| {
-        let space_id = space_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv6_prefix = ipv6_prefix().trim().to_owned();
-        let ipv6_prefix_len = ipv6_prefix_len().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || ipv6_prefix.is_empty() || ipv6_prefix_len.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        let ipv6_prefix_len = match ipv6_prefix_len.parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv6 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
-        let (ipv6_prefix, ipv6_prefix_len) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_pool = inet::AssignmentPoolIpv6 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv6_prefix,
-            ipv6_prefix_len,
-            pool_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_space_id: space_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool", space_id=space_id), &new_pool, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv6Space { space_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv6 pool".to_string()));
-                }
-            }
-        });
-    };
-
-    rsx! {
-        div {
-            h1 { "Add IPv6 Assignment Pool" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix",
-                value: "{ipv6_prefix}",
-                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix Length",
-                value: "{ipv6_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_pool,
-                "Add IPv6 Pool"
-            }
-        }
-    }
-}
-
-#[component]
-fn Ipv6AssignmentAdd(space_id: i32, pool_id: i32) -> Element {
-    let token = use_token();
-    let mut name = use_signal(|| String::new());
-    let mut description = use_signal(|| String::new());
-    let mut ipv6_prefix = use_signal(|| String::new());
-    let mut ipv6_prefix_len = use_signal(|| String::new());
-    let mut visibility = use_signal(|| String::from("Public"));
-    let mut error = use_signal(|| None);
-
-    let add_assignment = move |_| {
-        let space_id = space_id;
-        let pool_id = pool_id;
-        let token = token.clone();
-        let name = name().trim().to_owned();
-        let description = description().trim().to_owned();
-        let ipv6_prefix = ipv6_prefix().trim().to_owned();
-        let visibility = visibility().clone();
-
-        if name.is_empty() || ipv6_prefix.is_empty() || visibility.is_empty() {
-            error.set(Some("All fields are required".to_string()));
-            return;
-        }
-
-        let ipv6_prefix_len = match ipv6_prefix_len().parse::<i32>() {
-            Ok(val) => val,
-            Err(_) => {
-                error.set(Some("Invalid IPv6 prefix length value".to_string()));
-                return;
-            }
-        };
-
-        let prefix_obj = inet::Ipv6Prefix::new(&ipv6_prefix, ipv6_prefix_len);
-        let (ipv6_prefix, _) = match prefix_obj {
-            Ok(prefix_obj) => (prefix_obj.prefix_octets(), prefix_obj.prefix_len()),
-            Err(s) => {
-                error.set(Some(s.clone()));
-                return;
-            }
-        };
-
-        let visibility = match visibility.as_str() {
-            "Public" | "Private" => visibility,
-            _ => {
-                error.set(Some("Invalid visibility value".to_string()));
-                return;
-            }
-        };
-
-        let new_assignment = inet::AssignmentIpv6 {
-            id: 0, // This will be set by the server
-            name,
-            description,
-            ipv6_prefix,
-            ipv6_prefix_len,
-            assignment_visibility: inet::ObjectVisibility::from_str(&visibility).unwrap(),
-            assignment_pool_id: pool_id,
-        };
-
-        spawn(async move {
-            let res: Result<inet::ApiResponse, _> = fetch::post(&format!("/api/v1/ipv6/assignment_space/{space_id}/pool/{pool_id}/assignment", space_id=space_id, pool_id=pool_id), &new_assignment, token.as_deref()).await;
-            match res {
-                Ok(inet::ApiResponse { error: None, result: _ }) => {
-                    let nav = use_context::<Navigator>();
-                    nav.push(Route::Ipv6Pool { space_id, pool_id });
-                }
-                Ok(inet::ApiResponse { error: Some(err), result: _ }) => {
-                    error.set(Some(err));
-                }
-                Err(_) => {
-                    error.set(Some("Failed to add IPv6 assignment".to_string()));
-                }
-            }
-        });
-    };
-
-    rsx! {
-        div {
-            h1 { "Add IPv6 Assignment" }
-            if let Some(err) = error() {
-                p { style: "color: red;", "{err}" }
-            }
-            component::TextInput {
-                placeholder: "Name",
-                value: "{name}",
-                oninput: move |e: Event<FormData>| name.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "Description",
-                value: "{description}",
-                oninput: move |e: Event<FormData>| description.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix",
-                value: "{ipv6_prefix}",
-                oninput: move |e: Event<FormData>| ipv6_prefix.set(e.value().clone()),
-            }
-            component::TextInput {
-                placeholder: "IPv6 Prefix Length",
-                value: "{ipv6_prefix_len}",
-                oninput: move |e: Event<FormData>| ipv6_prefix_len.set(e.value().clone()),
-            }
-            label {
-                class: "select-label",
-                "Visibility"
-                select {
-                    value: "{visibility}",
-                    oninput: move |e| visibility.set(e.value().clone()),
-                    option { "Public" }
-                    option { "Private" }
-                }
-            }
-            button {
-                onclick: add_assignment,
-                "Add IPv6 Assignment"
-            }
-        }
+        h1 { "Page not found" }
+        p { "No page exists at {path}." }
+        Link { to: Route::Home {}, "Browse assignments" }
     }
 }

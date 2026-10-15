@@ -28,43 +28,41 @@ pub struct TableRow {
 
 
 #[component]
-pub fn AssignmentTable(mut rows: Vec<TableRow>) -> Element {
+pub fn AssignmentTable(rows: Vec<TableRow>) -> Element {
     rsx! {
-        table {
+        div {
             class: "assignment-table",
-            thead {
-                tr {
-                    th { "Assignment" }
-                    th { "Name" }
-                    th { "Description" }
+            role: "table",
+            "aria-label": "Assignments",
+            div {
+                class: "assignment-head",
+                role: "rowgroup",
+                div {
+                    class: "assignment-row assignment-header",
+                    role: "row",
+                    div { class: "assignment-cell", role: "columnheader", "Assignment" }
+                    div { class: "assignment-cell", role: "columnheader", "Name" }
+                    div { class: "assignment-cell", role: "columnheader", "Description" }
                 }
             }
-            tbody {
+            div {
+                class: "assignment-body",
+                role: "rowgroup",
                 for row in rows {
-                    tr {
-                        class: if row.visibility == "Public" { "public" } else { "private" },
+                    div {
+                        class: if row.visibility == "Public" { "assignment-row public" } else { "assignment-row private" },
+                        role: "row",
                         title: row.visibility,
-                        td {
-                            div {
-                                class: "scrollable",
-                                Link {
-                                    to: NavigationTarget::<crate::Route>::from_str(&row.url).unwrap(),
-                                    "{row.assignment}"
-                                }
+                        div {
+                            class: "assignment-cell",
+                            role: "cell",
+                            Link {
+                                to: NavigationTarget::<crate::Route>::from_str(&row.url).unwrap(),
+                                "{row.assignment}"
                             }
                         }
-                        td {
-                            div {
-                                class: "scrollable",
-                                "{row.name}"
-                            }
-                        }
-                        td {
-                            div {
-                                class: "scrollable",
-                                "{row.description}"
-                            }
-                        }
+                        div { class: "assignment-cell", role: "cell", "{row.name}" }
+                        div { class: "assignment-cell", role: "cell", "{row.description}" }
                     }
                 }
             }

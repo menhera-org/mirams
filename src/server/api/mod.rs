@@ -1,9 +1,6 @@
-
+mod v1_assignment;
 mod v1_login;
 mod v1_user;
-mod v1_asn;
-mod v1_ipv4;
-mod v1_ipv6;
 
 #[cfg(test)]
 mod tests;
@@ -12,60 +9,42 @@ use crate::store::DbConnection;
 
 use super::Server;
 
-use axum::handler::Handler;
-use axum::Router;
 use axum::body::Body;
+use axum::handler::Handler;
 use axum::routing::{get, post};
+use axum::Router;
 
-use http::StatusCode;
-use tower_http::auth::{AsyncRequireAuthorizationLayer, AsyncAuthorizeRequest};
-use http::{Request, Response, header::AUTHORIZATION, Method};
-use tower::ServiceBuilder;
 use futures_util::future::BoxFuture;
+use http::StatusCode;
+use http::{header::AUTHORIZATION, Method, Request, Response};
+use tower::ServiceBuilder;
+use tower_http::auth::{AsyncAuthorizeRequest, AsyncRequireAuthorizationLayer};
 use tower_http::cors;
 use tower_http::timeout::TimeoutLayer;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use std::time::Duration;
-use std::marker::PhantomData;
 use std::any::TypeId;
-
+use std::marker::PhantomData;
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ApiResponse {
     pub error: Option<String>,
 
-    #[serde(flatten)] 
+    #[serde(flatten)]
     pub result: Option<ApiResponseVariant>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")] 
+#[serde(rename_all = "snake_case")]
 pub enum ApiResponseVariant {
     User(User),
     Users(Vec<User>),
     ApiToken(String),
 
-    AsnAssignmentSpace(crate::asn::AssignmentSpaceAsn),
-    AsnAssignmentPool(crate::asn::AssignmentPoolAsn),
-    AsnAssignment(crate::asn::AssignmentAsn),
-    Ipv4AssignmentSpace(crate::ipv4::AssignmentSpaceIpv4),
-    Ipv4AssignmentPool(crate::ipv4::AssignmentPoolIpv4),
-    Ipv4Assignment(crate::ipv4::AssignmentIpv4),
-    Ipv6AssignmentSpace(crate::ipv6::AssignmentSpaceIpv6),
-    Ipv6AssignmentPool(crate::ipv6::AssignmentPoolIpv6),
-    Ipv6Assignment(crate::ipv6::AssignmentIpv6),
-
-    AsnAssignmentSpaces(Vec<crate::asn::AssignmentSpaceAsn>),
-    AsnAssignmentPools(Vec<crate::asn::AssignmentPoolAsn>),
-    AsnAssignments(Vec<crate::asn::AssignmentAsn>),
-    Ipv4AssignmentSpaces(Vec<crate::ipv4::AssignmentSpaceIpv4>),
-    Ipv4AssignmentPools(Vec<crate::ipv4::AssignmentPoolIpv4>),
-    Ipv4Assignments(Vec<crate::ipv4::AssignmentIpv4>),
-    Ipv6AssignmentSpaces(Vec<crate::ipv6::AssignmentSpaceIpv6>),
-    Ipv6AssignmentPools(Vec<crate::ipv6::AssignmentPoolIpv6>),
-    Ipv6Assignments(Vec<crate::ipv6::AssignmentIpv6>),
+    Assignment(crate::assignment::Assignment),
+    Assignments(Vec<crate::assignment::Assignment>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -74,6 +53,7 @@ pub struct User {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct MetadataUpdateRequest {
     pub name: String,
     pub description: String,
@@ -90,7 +70,6 @@ pub fn build_json_response(response: ApiResponse, status: u16) -> Response<Body>
         .unwrap()
 }
 
-
 pub fn build_api_v1_router<T>() -> Router<Server<T>>
 where
     T: DbConnection + Clone + Send + Sync + 'static,
@@ -103,11 +82,7 @@ where
 
     router = router.nest("/user", v1_user::build_router());
 
-    router = router.nest("/asn", v1_asn::build_router());
-
-    router = router.nest("/ipv4", v1_ipv4::build_router());
-
-    router = router.nest("/ipv6", v1_ipv6::build_router());
+    router = router.merge(v1_assignment::build_router());
 
     // at the end, define the default route
     router = router.fallback(fallback_handler());
@@ -116,11 +91,10 @@ where
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_origin(cors::Any);
 
-    let timeout = TimeoutLayer::with_status_code(StatusCode::GATEWAY_TIMEOUT, Duration::from_secs(30));
+    let timeout =
+        TimeoutLayer::with_status_code(StatusCode::GATEWAY_TIMEOUT, Duration::from_secs(30));
 
-    let service = ServiceBuilder::new()
-        .layer(cors)
-        .layer(timeout);
+    let service = ServiceBuilder::new().layer(cors).layer(timeout);
 
     router = router.layer(service);
 
@@ -157,7 +131,8 @@ impl<T, R> AuthHandler<T, R> {
         Self::new().into_layer()
     }
 
-    pub fn new_auth_required_layer() -> AsyncRequireAuthorizationLayer<AuthHandler<T, AuthRequired>> {
+    pub fn new_auth_required_layer() -> AsyncRequireAuthorizationLayer<AuthHandler<T, AuthRequired>>
+    {
         Self::new_auth_required().into_layer()
     }
 
@@ -184,10 +159,12 @@ where
                 let request = Request::from_parts(parts, body);
                 return Ok(request);
             };
-    
+
             let mut request = Request::from_parts(parts, body);
-    
-            let authorization = request.headers().get(AUTHORIZATION)
+
+            let authorization = request
+                .headers()
+                .get(AUTHORIZATION)
                 .and_then(|header| header.to_str().ok())
                 .map(|value| value.trim().to_owned());
 
@@ -199,12 +176,12 @@ where
                     let user = tokio::task::spawn_blocking(move || {
                         let user_store = store.users();
                         match user_store.get_user_from_api_key(&token) {
-                            Ok(Some(username)) => {
-                                Some(User { username })
-                            },
+                            Ok(Some(username)) => Some(User { username }),
                             _ => None,
                         }
-                    }).await.unwrap();
+                    })
+                    .await
+                    .unwrap();
                     if let Some(user) = user {
                         request.extensions_mut().insert(user);
                         return Ok(request);

@@ -292,6 +292,7 @@ body {
 }
 
 #app-main {
+  min-inline-size: 0;
   margin: .5rem;
 }
 
@@ -370,47 +371,50 @@ button:not(.link-button) {
   color: var(--theme-disabled-text-color);
 }
 
+/* Shared content-sized tracks can shrink all the way down to the container. */
 .assignment-table {
-  table-layout: fixed;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
   margin-inline: 0;
   margin-block: .5rem;
-  border-collapse: collapse;
   inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
   box-sizing: border-box;
-  border-spacing: 0;
-}
-
-.assignment-table :is(th, td) {
   border: solid 1px var(--theme-disabled-text-color);
-  overflow-inline: auto;
+  border-block-end: 0;
 }
 
-.assignment-table td > .scrollable, .assignment-table th {
+.assignment-head, .assignment-body, .assignment-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  min-inline-size: 0;
+}
+
+.assignment-cell {
+  min-inline-size: 0;
+  overflow: auto;
+  white-space: nowrap;
   padding-inline: 1rem;
   padding-block: .5rem;
+  border-inline-end: solid 1px var(--theme-disabled-text-color);
+  border-block-end: solid 1px var(--theme-disabled-text-color);
 }
 
-.assignment-table > tbody > tr:nth-of-type(2n + 1) {
+.assignment-cell:last-child { border-inline-end: 0; }
+.assignment-header { font-weight: bold; text-align: center; }
+
+.assignment-body > .assignment-row:nth-child(2n + 1) {
   background-color: #fff;
 }
 
-.assignment-table > tbody > tr.private {
+.assignment-body > .assignment-row.private {
   background-color: #fee;
 }
 
-.assignment-table > tbody > tr.private:nth-child(2n) {
+.assignment-body > .assignment-row.private:nth-child(2n) {
   background-color: #edd;
-}
-
-.scrollable {
-  inline-size: 100%;
-  block-size: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  overflow: auto;
-  white-space: nowrap;
-  box-sizing: border-box;
 }
 
 .add-button-toolbar {
@@ -473,3 +477,38 @@ label.select-label > select {
   border-block-end: solid 1px var(--theme-disabled-text-color);
   margin-block-end: 1rem;
 }
+
+/* Match dropdowns to the app's text fields and buttons. */
+select {
+  appearance: none;
+  font: inherit;
+  color: var(--theme-primary-text-color);
+  background-color: var(--theme-primary-background-color);
+  border: 1px solid var(--theme-disabled-text-color);
+  border-radius: .375rem;
+  padding: .5rem 2.5rem .5rem .875rem;
+  min-block-size: 2.5rem;
+  max-inline-size: 100%;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--theme-accent-color) 50%), linear-gradient(135deg, var(--theme-accent-color) 50%, transparent 50%);
+  background-position: right 1rem center, right .7rem center;
+  background-size: .3rem .3rem;
+  background-repeat: no-repeat;
+}
+select:hover:not(:disabled) { border-color: var(--theme-accent-color); }
+select:focus-visible {
+  outline: 2px solid var(--theme-accent-color);
+  outline-offset: 2px;
+}
+select:disabled {
+  color: var(--theme-secondary-text-color);
+  background-color: var(--theme-main-background-color);
+  cursor: default;
+  opacity: .75;
+}
+label.text-input > select { flex: 1; min-inline-size: 0; }
+label.select-label > select { max-inline-size: 100%; }
+
+.breadcrumbs { overflow: auto; white-space: nowrap; padding-block: .5rem; }
+.move-assignment-form { border-block-start: 1px solid var(--theme-disabled-text-color); padding-block: 1rem; margin-block: 1rem; }
+button:disabled { opacity: .6; cursor: default; }

@@ -1,10 +1,9 @@
-
 use serde::{Deserialize, Serialize};
 
-use std::net::Ipv4Addr;
-use std::net::Ipv6Addr;
 use std::convert::TryFrom;
 use std::fmt::{self, Display, Formatter};
+use std::net::Ipv4Addr;
+use std::net::Ipv6Addr;
 use std::str::FromStr;
 
 pub type RawAsn = u32;
@@ -113,10 +112,14 @@ impl Ipv4Prefix {
         let ip = match prefix.trim().parse::<Ipv4Addr>() {
             Ok(ip) => ip,
             Err(e) => return Err(format!("Invalid IPv4 address: {}", e)),
-        }.octets();
+        }
+        .octets();
         let network = ipv4_network_address(ip, prefix_len as u8);
         if ip != network {
-            return Err(format!("Invalid IPv4 prefix: {} is not a network address for prefix length {}", prefix, prefix_len));
+            return Err(format!(
+                "Invalid IPv4 prefix: {} is not a network address for prefix length {}",
+                prefix, prefix_len
+            ));
         }
         Ok(Ipv4Prefix {
             prefix: ip,
@@ -125,7 +128,13 @@ impl Ipv4Prefix {
     }
 
     pub fn prefix(&self) -> String {
-        Ipv4Addr::new(self.prefix[0], self.prefix[1], self.prefix[2], self.prefix[3]).to_string()
+        Ipv4Addr::new(
+            self.prefix[0],
+            self.prefix[1],
+            self.prefix[2],
+            self.prefix[3],
+        )
+        .to_string()
     }
 
     pub fn prefix_octets(&self) -> [u8; 4] {
@@ -170,10 +179,14 @@ impl Ipv6Prefix {
         let ip = match prefix.trim().parse::<Ipv6Addr>() {
             Ok(ip) => ip,
             Err(e) => return Err(format!("Invalid IPv6 address: {}", e)),
-        }.octets();
+        }
+        .octets();
         let network = ipv6_network_address(ip, prefix_len as u8);
         if ip != network {
-            return Err(format!("Invalid IPv6 prefix: {} is not a network address for prefix length {}", prefix, prefix_len));
+            return Err(format!(
+                "Invalid IPv6 prefix: {} is not a network address for prefix length {}",
+                prefix, prefix_len
+            ));
         }
         Ok(Ipv6Prefix {
             prefix: ip,
@@ -211,38 +224,6 @@ impl Display for Ipv6Prefix {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}/{}", self.prefix(), self.prefix_len)
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ApiResponse {
-    pub error: Option<String>,
-
-    #[serde(flatten)] 
-    pub result: Option<ApiResponseVariant>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")] 
-pub enum ApiResponseVariant {
-    AsnAssignmentSpace(AssignmentSpaceAsn),
-    AsnAssignmentPool(AssignmentPoolAsn),
-    AsnAssignment(AssignmentAsn),
-    Ipv4AssignmentSpace(AssignmentSpaceIpv4),
-    Ipv4AssignmentPool(AssignmentPoolIpv4),
-    Ipv4Assignment(AssignmentIpv4),
-    Ipv6AssignmentSpace(AssignmentSpaceIpv6),
-    Ipv6AssignmentPool(AssignmentPoolIpv6),
-    Ipv6Assignment(AssignmentIpv6),
-
-    AsnAssignmentSpaces(Vec<AssignmentSpaceAsn>),
-    AsnAssignmentPools(Vec<AssignmentPoolAsn>),
-    AsnAssignments(Vec<AssignmentAsn>),
-    Ipv4AssignmentSpaces(Vec<AssignmentSpaceIpv4>),
-    Ipv4AssignmentPools(Vec<AssignmentPoolIpv4>),
-    Ipv4Assignments(Vec<AssignmentIpv4>),
-    Ipv6AssignmentSpaces(Vec<AssignmentSpaceIpv6>),
-    Ipv6AssignmentPools(Vec<AssignmentPoolIpv6>),
-    Ipv6Assignments(Vec<AssignmentIpv6>),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -291,215 +272,119 @@ impl FromStr for ObjectVisibility {
     }
 }
 
-/// ASN assignment space. Can contain multiple pools.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentSpaceAsn {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Assignment Space name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment space
-    pub space_visibility: ObjectVisibility,
-
-    /// Start ASN of the assignment space
-    pub asn_from: u32,
-
-    /// End ASN of the assignment space
-    pub asn_to: u32,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "resource_type", rename_all = "lowercase")]
+pub enum AssignmentRange {
+    Asn {
+        asn_from: u32,
+        asn_to: u32,
+    },
+    Ipv4 {
+        ipv4_prefix: [u8; 4],
+        ipv4_prefix_len: i32,
+    },
+    Ipv6 {
+        ipv6_prefix: [u8; 16],
+        ipv6_prefix_len: i32,
+    },
 }
 
-/// ASN assignment pool. Can contain multiple assignments.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentPoolAsn {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Parent assignment space ID
-    pub assignment_space_id: i32,
-
-    /// Assignment pool name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment pool
-    pub pool_visibility: ObjectVisibility,
-
-    /// Start ASN of the assignment pool
-    pub asn_from: u32,
-
-    /// End ASN of the assignment pool
-    pub asn_to: u32,
+impl AssignmentRange {
+    pub fn resource_type(&self) -> &'static str {
+        match self {
+            Self::Asn { .. } => "asn",
+            Self::Ipv4 { .. } => "ipv4",
+            Self::Ipv6 { .. } => "ipv6",
+        }
+    }
+    pub fn label(&self) -> String {
+        match *self {
+            Self::Asn { asn_from, asn_to } => format_asn_range(asn_from, asn_to),
+            Self::Ipv4 {
+                ipv4_prefix,
+                ipv4_prefix_len,
+            } => format_ipv4_prefix(ipv4_prefix, ipv4_prefix_len),
+            Self::Ipv6 {
+                ipv6_prefix,
+                ipv6_prefix_len,
+            } => format_ipv6_prefix(ipv6_prefix, ipv6_prefix_len),
+        }
+    }
+    pub fn fields(&self) -> (String, String) {
+        match *self {
+            Self::Asn { asn_from, asn_to } => (asn_from.to_string(), asn_to.to_string()),
+            Self::Ipv4 {
+                ipv4_prefix,
+                ipv4_prefix_len,
+            } => (
+                Ipv4Addr::from(ipv4_prefix).to_string(),
+                ipv4_prefix_len.to_string(),
+            ),
+            Self::Ipv6 {
+                ipv6_prefix,
+                ipv6_prefix_len,
+            } => (
+                Ipv6Addr::from(ipv6_prefix).to_string(),
+                ipv6_prefix_len.to_string(),
+            ),
+        }
+    }
+    pub fn from_fields(family: &str, first: &str, second: &str) -> Result<Self, String> {
+        match family {
+            "asn" => {
+                let asn_from = first
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| "Invalid start ASN")?;
+                let asn_to = second
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| "Invalid end ASN")?;
+                if asn_from > asn_to {
+                    return Err("Start ASN must not exceed end ASN".into());
+                }
+                Ok(Self::Asn { asn_from, asn_to })
+            }
+            "ipv4" => {
+                let prefix = Ipv4Prefix::new(
+                    first,
+                    second.trim().parse().map_err(|_| "Invalid prefix length")?,
+                )?;
+                Ok(Self::Ipv4 {
+                    ipv4_prefix: prefix.prefix_octets(),
+                    ipv4_prefix_len: prefix.prefix_len(),
+                })
+            }
+            "ipv6" => {
+                let prefix = Ipv6Prefix::new(
+                    first,
+                    second.trim().parse().map_err(|_| "Invalid prefix length")?,
+                )?;
+                Ok(Self::Ipv6 {
+                    ipv6_prefix: prefix.prefix_octets(),
+                    ipv6_prefix_len: prefix.prefix_len(),
+                })
+            }
+            _ => Err("Unknown resource type".into()),
+        }
+    }
 }
 
-/// ASN assignment to a specific entity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentAsn {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Assignment {
     #[serde(default)]
     pub id: i32,
-
-    /// Parent assignment pool ID
-    pub assignment_pool_id: i32,
-
-    /// Assignment name
+    pub parent_id: Option<i32>,
     pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
     pub description: String,
-
-    /// Assignment visibility
-    pub assignment_visibility: ObjectVisibility,
-
-    /// Assigned ASN
-    pub asn: u32,
+    pub visibility: ObjectVisibility,
+    #[serde(flatten)]
+    pub range: AssignmentRange,
 }
 
-/// IPv4 assignment space. Can contain multiple pools.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentSpaceIpv4 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Assignment Space name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment space
-    pub space_visibility: ObjectVisibility,
-
-    /// IPv4 prefix of the assignment space, in big-endian bit and byte order
-    pub ipv4_prefix: [u8; 4],
-
-    /// Length of the IPv4 prefix
-    pub ipv4_prefix_len: i32,
-}
-
-/// IPv4 assignment pool. Can contain multiple assignments.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentPoolIpv4 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Parent assignment space ID
-    pub assignment_space_id: i32,
-
-    /// Assignment pool name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment pool
-    pub pool_visibility: ObjectVisibility,
-
-    /// IPv4 prefix of the assignment pool, in big-endian bit and byte order
-    pub ipv4_prefix: [u8; 4],
-
-    /// Length of the IPv4 prefix
-    pub ipv4_prefix_len: i32,
-}
-
-/// IPv4 assignment to a specific entity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentIpv4 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Parent assignment pool ID
-    pub assignment_pool_id: i32,
-
-    /// Assignment name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Assignment visibility
-    pub assignment_visibility: ObjectVisibility,
-
-    /// IPv4 prefix of the assignment, in big-endian bit and byte order
-    pub ipv4_prefix: [u8; 4],
-
-    /// Length of the IPv4 prefix
-    pub ipv4_prefix_len: i32,
-}
-
-/// IPv6 assignment space. Can contain multiple pools.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentSpaceIpv6 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Assignment Space name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment space
-    pub space_visibility: ObjectVisibility,
-
-    /// IPv6 prefix of the assignment space, in big-endian bit and byte order
-    pub ipv6_prefix: [u8; 16],
-
-    /// Length of the IPv6 prefix
-    pub ipv6_prefix_len: i32,
-}
-
-/// IPv6 assignment pool. Can contain multiple assignments.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentPoolIpv6 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Parent assignment space ID
-    pub assignment_space_id: i32,
-
-    /// Assignment pool name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Visibility of the assignment pool
-    pub pool_visibility: ObjectVisibility,
-
-    /// IPv6 prefix of the assignment pool, in big-endian bit and byte order
-    pub ipv6_prefix: [u8; 16],
-
-    /// Length of the IPv6 prefix
-    pub ipv6_prefix_len: i32,
-}
-
-/// IPv6 assignment to a specific entity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignmentIpv6 {
-    #[serde(default)]
-    pub id: i32,
-
-    /// Parent assignment pool ID
-    pub assignment_pool_id: i32,
-
-    /// Assignment name
-    pub name: String,
-
-    /// Document actual usage ratio, purpose, etc.
-    pub description: String,
-
-    /// Assignment visibility
-    pub assignment_visibility: ObjectVisibility,
-
-    /// IPv6 prefix of the assignment, in big-endian bit and byte order
-    pub ipv6_prefix: [u8; 16],
-
-    /// Length of the IPv6 prefix
-    pub ipv6_prefix_len: i32,
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApiResponse {
+    pub error: Option<String>,
+    pub assignment: Option<Assignment>,
+    pub assignments: Option<Vec<Assignment>>,
 }

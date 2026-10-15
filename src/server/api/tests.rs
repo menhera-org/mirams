@@ -4,20 +4,22 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-fn app() -> (Router, String) {
-    let db = crate::db_sqlite::SqliteConnection::open_memory().unwrap();
-    let store = crate::Store::new(db);
-    crate::example_data::add_example_data(store.clone());
-    store
-        .users()
-        .set_password("alice", "test password")
-        .unwrap();
+fn app() -> (
+    Router,
+    String,
+    crate::Store<crate::db_sqlite::SqliteConnection>,
+) {
+    let store = crate::Store::new(crate::db_sqlite::SqliteConnection::open_memory().unwrap());
+    store.users().set_password("alice", "password").unwrap();
     let token = store.users().generate_api_key("alice").unwrap();
-    let server = Server::new(store);
-    let app = build_api_v1_router()
-        .layer(Extension(server.clone()))
-        .with_state(server);
-    (app, token)
+    let server = Server::new(store.clone());
+    (
+        build_api_v1_router()
+            .layer(Extension(server.clone()))
+            .with_state(server),
+        token,
+        store,
+    )
 }
 
 async fn request(
@@ -27,245 +29,472 @@ async fn request(
     body: Value,
     token: Option<&str>,
 ) -> (u16, Value) {
-    let mut builder = Request::builder().method(method).uri(path);
+    let mut request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header("Content-Type", "application/json");
     if let Some(token) = token {
-        builder = builder.header(AUTHORIZATION, format!("Bearer {token}"));
+        request = request.header(AUTHORIZATION, format!("Bearer {token}"));
     }
-    let req = builder
-        .header("Content-Type", "application/json")
-        .body(Body::from(body.to_string()))
+    let response = app
+        .clone()
+        .oneshot(request.body(Body::from(body.to_string())).unwrap())
+        .await
         .unwrap();
-    let response = app.clone().oneshot(req).await.unwrap();
     let status = response.status().as_u16();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-    (status, body)
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+fn assignment(family: &str) -> Value {
+    let mut value = json!({"name":"Assignment", "description":"description", "visibility":"public", "resource_type":family, "parent_id":null});
+    match family {
+        "asn" => {
+            value["asn_from"] = json!(65000);
+            value["asn_to"] = json!(65199);
+        }
+        "ipv4" => {
+            value["ipv4_prefix"] = json!([192, 168, 0, 0]);
+            value["ipv4_prefix_len"] = json!(16);
+        }
+        _ => {
+            value["ipv6_prefix"] = json!([32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+            value["ipv6_prefix_len"] = json!(32);
+        }
+    }
+    value
+}
+
+async fn create(app: &Router, token: &str, body: Value) -> i64 {
+    let (status, response) = request(app, "POST", "/assignment", body, Some(token)).await;
+    assert_eq!(status, 200, "{response}");
+    response["assignment"]["id"].as_i64().unwrap()
 }
 
 #[tokio::test]
-async fn visibility_updates_and_anonymous_access() {
-    let (app, token) = app();
+async fn arbitrary_nesting_containment_and_sibling_overlap_rules() {
+    let (app, token, _) = app();
     for family in ["asn", "ipv4", "ipv6"] {
-        let space_path = format!("/{family}/assignment_space/1");
-        let pool_path = format!("{space_path}/pool/1");
-        let assignment_path = format!("{pool_path}/assignment/1");
-        for (path, variant, field, list_path, list_variant) in [
-            (
-                &space_path,
-                format!("{family}_assignment_space"),
-                "space_visibility",
-                format!("/{family}/assignment_space"),
-                format!("{family}_assignment_spaces"),
-            ),
-            (
-                &pool_path,
-                format!("{family}_assignment_pool"),
-                "pool_visibility",
-                format!("{space_path}/pool"),
-                format!("{family}_assignment_pools"),
-            ),
-            (
-                &assignment_path,
-                format!("{family}_assignment"),
-                "assignment_visibility",
-                format!("{pool_path}/assignment"),
-                format!("{family}_assignments"),
-            ),
-        ] {
-            let update = json!({"name": "Updated", "description": "New description", "visibility": "private"});
+        let original = assignment(family);
+        let root = create(&app, &token, original.clone()).await;
+        // Identical roots may overlap and remain independent.
+        let other_root = create(&app, &token, original.clone()).await;
+        assert_ne!(root, other_root);
+        let mut parent = root;
+        for depth in 0..8 {
+            let mut child = original.clone();
+            child["parent_id"] = json!(parent);
+            child["name"] = json!(format!("Depth {depth}"));
+            let id = create(&app, &token, child.clone()).await;
             assert_eq!(
-                request(&app, "PUT", path, update.clone(), None).await.0,
-                401
-            );
-            let (status, body) = request(&app, "PUT", path, update, Some(&token)).await;
-            assert_eq!(status, 200, "{family}: {body}");
-            assert_eq!(body[&variant][field], "private");
-            assert_eq!(body[&variant]["name"], "Updated");
-            assert_eq!(body[&variant]["description"], "New description");
-            assert_eq!(request(&app, "GET", path, Value::Null, None).await.0, 404);
-            let (status, list) = request(&app, "GET", &list_path, Value::Null, None).await;
-            assert_eq!(status, 200);
-            assert_eq!(list[&list_variant].as_array().unwrap().len(), 0);
-
-            // A private parent hides public descendants, including direct assignment URLs.
-            if path == &space_path || path == &pool_path {
-                assert_eq!(
-                    request(&app, "GET", &assignment_path, Value::Null, None)
-                        .await
-                        .0,
-                    404
-                );
-                assert_eq!(
-                    request(
-                        &app,
-                        "GET",
-                        &format!("{pool_path}/assignment"),
-                        Value::Null,
-                        None
-                    )
+                request(&app, "POST", "/assignment", child, Some(&token))
                     .await
                     .0,
-                    404
-                );
-            }
-
-            // Older metadata-only requests must preserve the stored visibility.
-            let legacy = json!({"name": "Legacy", "description": "Legacy description"});
-            let (status, body) = request(&app, "PUT", path, legacy, Some(&token)).await;
-            assert_eq!(status, 200);
-            assert_eq!(body[&variant][field], "private");
-            let (_, body) = request(&app, "GET", path, Value::Null, Some(&token)).await;
-            assert_eq!(body[&variant][field], "private");
-
-            let invalid = json!({"name": "Invalid", "description": "", "visibility": "invalid"});
-            assert_eq!(
-                request(&app, "PUT", path, invalid, Some(&token)).await.0,
-                422
+                400
             );
-            let public = json!({"name": "Public again", "description": "", "visibility": "public"});
+            let (_, ancestors) = request(
+                &app,
+                "GET",
+                &format!("/assignment/{id}/ancestors"),
+                Value::Null,
+                Some(&token),
+            )
+            .await;
             assert_eq!(
-                request(&app, "PUT", path, public, Some(&token)).await.0,
-                200
+                ancestors["assignments"].as_array().unwrap().len(),
+                depth + 1
             );
-            let (status, body) = request(&app, "GET", path, Value::Null, None).await;
-            assert_eq!(status, 200);
-            assert_eq!(body[&variant][field], "public");
+            assert_eq!(ancestors["assignments"][0]["id"], root);
+            parent = id;
         }
+        let mut outside = original.clone();
+        outside["parent_id"] = json!(parent);
+        match family {
+            "asn" => outside["asn_to"] = json!(65200),
+            "ipv4" => outside["ipv4_prefix"] = json!([10, 0, 0, 0]),
+            _ => outside["ipv6_prefix"] = json!(vec![0; 16]),
+        }
+        assert_eq!(
+            request(&app, "POST", "/assignment", outside, Some(&token))
+                .await
+                .0,
+            400
+        );
+        let mut wrong_family = assignment(if family == "asn" { "ipv4" } else { "asn" });
+        wrong_family["parent_id"] = json!(parent);
+        assert_eq!(
+            request(&app, "POST", "/assignment", wrong_family, Some(&token))
+                .await
+                .0,
+            400
+        );
+        let mut orphan = original;
+        orphan["parent_id"] = json!(i32::MAX);
+        assert_eq!(
+            request(&app, "POST", "/assignment", orphan, Some(&token))
+                .await
+                .0,
+            404
+        );
     }
 }
 
 #[tokio::test]
-async fn overlapping_spaces_have_independent_pools_and_assignments() {
-    let (app, token) = app();
-    for family in ["asn", "ipv4", "ipv6"] {
-        let spaces_path = format!("/{family}/assignment_space");
-        let space_path = format!("{spaces_path}/1");
-        let pool_path = format!("{space_path}/pool/1");
-        let (_, body) = request(&app, "GET", &space_path, Value::Null, Some(&token)).await;
-        let space = body[format!("{family}_assignment_space")].clone();
-        let (_, body) = request(&app, "GET", &pool_path, Value::Null, Some(&token)).await;
-        let pool = body[format!("{family}_assignment_pool")].clone();
-        let (_, body) = request(
+async fn visibility_inherits_from_every_ancestor_and_metadata_remains_editable() {
+    let (app, token, _) = app();
+    let root = create(&app, &token, assignment("asn")).await;
+    let mut child = assignment("asn");
+    child["parent_id"] = json!(root);
+    let child = create(&app, &token, child).await;
+    let mut leaf = assignment("asn");
+    leaf["parent_id"] = json!(child);
+    let leaf = create(&app, &token, leaf).await;
+    let update = json!({"name":"Private", "description":"Updated", "visibility":"private"});
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            &format!("/assignment/{root}"),
+            update.clone(),
+            None
+        )
+        .await
+        .0,
+        401
+    );
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            &format!("/assignment/{root}"),
+            update,
+            Some(&token)
+        )
+        .await
+        .0,
+        200
+    );
+    for id in [root, child, leaf] {
+        assert_eq!(
+            request(&app, "GET", &format!("/assignment/{id}"), Value::Null, None)
+                .await
+                .0,
+            404
+        );
+        assert_eq!(
+            request(
+                &app,
+                "GET",
+                &format!("/assignment/{id}/ancestors"),
+                Value::Null,
+                None
+            )
+            .await
+            .0,
+            404
+        );
+        assert_eq!(
+            request(
+                &app,
+                "GET",
+                &format!("/assignment?parent_id={id}"),
+                Value::Null,
+                None
+            )
+            .await
+            .0,
+            404
+        );
+        assert_eq!(
+            request(
+                &app,
+                "GET",
+                &format!("/assignment/{id}"),
+                Value::Null,
+                Some(&token)
+            )
+            .await
+            .0,
+            200
+        );
+    }
+    let (_, roots) = request(&app, "GET", "/assignment", Value::Null, None).await;
+    assert_eq!(roots["assignments"].as_array().unwrap().len(), 0);
+    let (_, legacy) = request(
+        &app,
+        "PUT",
+        &format!("/assignment/{root}"),
+        json!({"name":"Metadata only", "description":""}),
+        Some(&token),
+    )
+    .await;
+    assert_eq!(legacy["assignment"]["visibility"], "private");
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            &format!("/assignment/{root}"),
+            json!({"name":"Public", "description":"", "visibility":"public"}),
+            Some(&token)
+        )
+        .await
+        .0,
+        200
+    );
+    assert_eq!(
+        request(
             &app,
             "GET",
-            &format!("{pool_path}/assignment/1"),
+            &format!("/assignment/{leaf}"),
+            Value::Null,
+            None
+        )
+        .await
+        .0,
+        200
+    );
+    // A private intermediate ancestor also hides a public leaf.
+    request(
+        &app,
+        "PUT",
+        &format!("/assignment/{child}"),
+        json!({"name":"Private child", "description":"", "visibility":"private"}),
+        Some(&token),
+    )
+    .await;
+    assert_eq!(
+        request(
+            &app,
+            "GET",
+            &format!("/assignment/{leaf}"),
+            Value::Null,
+            None
+        )
+        .await
+        .0,
+        404
+    );
+}
+
+#[tokio::test]
+async fn moving_subtrees_checks_containment_overlap_cycles_and_authentication() {
+    let (app, token, _) = app();
+    for family in ["asn", "ipv4", "ipv6"] {
+        let root_a = create(&app, &token, assignment(family)).await;
+        let root_b = create(&app, &token, assignment(family)).await;
+        let mut child = assignment(family);
+        child["parent_id"] = json!(root_a);
+        let child = create(&app, &token, child).await;
+        let mut leaf = assignment(family);
+        leaf["parent_id"] = json!(child);
+        let leaf = create(&app, &token, leaf).await;
+        let move_url = format!("/assignment/{child}/move");
+        let destination = json!({"parent_id":root_b});
+        assert_eq!(
+            request(&app, "POST", &move_url, destination.clone(), None)
+                .await
+                .0,
+            401
+        );
+        assert_eq!(
+            request(
+                &app,
+                "GET",
+                &format!("/assignment/{child}/move-targets"),
+                Value::Null,
+                None
+            )
+            .await
+            .0,
+            401
+        );
+        for target in [child, leaf] {
+            assert_eq!(
+                request(
+                    &app,
+                    "POST",
+                    &move_url,
+                    json!({"parent_id":target}),
+                    Some(&token)
+                )
+                .await
+                .0,
+                400
+            );
+        }
+        assert_eq!(
+            request(&app, "POST", &move_url, json!({}), Some(&token))
+                .await
+                .0,
+            422
+        );
+        assert_eq!(
+            request(
+                &app,
+                "POST",
+                &move_url,
+                json!({"parent_id":i32::MAX}),
+                Some(&token)
+            )
+            .await
+            .0,
+            404
+        );
+        let (_, targets) = request(
+            &app,
+            "GET",
+            &format!("/assignment/{child}/move-targets"),
             Value::Null,
             Some(&token),
         )
         .await;
-        let assignment = body[format!("{family}_assignment")].clone();
-
-        // Identical, narrower, and wider spaces are all permitted.
-        for kind in ["identical", "narrower", "wider"] {
-            let mut new_space = space.clone();
-            new_space["name"] = json!(kind);
-            if family == "asn" {
-                if kind == "narrower" {
-                    new_space["asn_to"] = json!(65099);
-                }
-                if kind == "wider" {
-                    new_space["asn_to"] = json!(65500);
-                }
-            } else {
-                let field = format!("{family}_prefix_len");
-                let len = space[&field].as_i64().unwrap();
-                if kind == "narrower" {
-                    new_space[&field] = json!(len + 1);
-                }
-                if kind == "wider" {
-                    new_space[&field] = json!(len - 1);
-                }
-            }
-            let (status, body) = request(&app, "POST", &spaces_path, new_space, Some(&token)).await;
-            assert_eq!(status, 200, "{family} {kind}: {body}");
-            let space_id = body[format!("{family}_assignment_space")]["id"]
-                .as_i64()
-                .unwrap();
-            let pools_path = format!("{spaces_path}/{space_id}/pool");
-            let mut new_pool = pool.clone();
-            new_pool["assignment_space_id"] = json!(space_id);
-            let (status, body) =
-                request(&app, "POST", &pools_path, new_pool.clone(), Some(&token)).await;
-            assert_eq!(status, 200, "{family}: {body}");
-            let pool_id = body[format!("{family}_assignment_pool")]["id"]
-                .as_i64()
-                .unwrap();
-            let assignments_path = format!("{pools_path}/{pool_id}/assignment");
-            let mut new_assignment = assignment.clone();
-            new_assignment["assignment_pool_id"] = json!(pool_id);
-            let (status, body) = request(
+        let ids: Vec<_> = targets["assignments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["id"].as_i64().unwrap())
+            .collect();
+        assert!(ids.contains(&root_b));
+        assert!(!ids.contains(&child));
+        assert!(!ids.contains(&leaf));
+        let (_, moved) = request(&app, "POST", &move_url, destination, Some(&token)).await;
+        assert_eq!(moved["assignment"]["parent_id"], root_b);
+        let (_, ancestors) = request(
+            &app,
+            "GET",
+            &format!("/assignment/{leaf}/ancestors"),
+            Value::Null,
+            Some(&token),
+        )
+        .await;
+        assert_eq!(ancestors["assignments"][0]["id"], root_b);
+        assert_eq!(ancestors["assignments"][1]["id"], child);
+        // The occupied destination rejects another overlapping subtree.
+        let mut conflict = assignment(family);
+        conflict["parent_id"] = json!(root_a);
+        let conflict = create(&app, &token, conflict).await;
+        assert_eq!(
+            request(
                 &app,
                 "POST",
-                &assignments_path,
-                new_assignment.clone(),
-                Some(&token),
+                &format!("/assignment/{conflict}/move"),
+                json!({"parent_id":root_b}),
+                Some(&token)
             )
-            .await;
-            assert_eq!(status, 200, "{family}: {body}");
-
-            // Overlap protection still applies within each parent.
-            assert_ne!(
-                request(&app, "POST", &pools_path, new_pool.clone(), Some(&token))
-                    .await
-                    .0,
-                200
-            );
-            assert_ne!(
-                request(
-                    &app,
-                    "POST",
-                    &assignments_path,
-                    new_assignment.clone(),
-                    Some(&token)
-                )
-                .await
-                .0,
-                200
-            );
-            // Containment remains enforced even when other spaces overlap.
-            if family == "asn" {
-                new_pool["asn_from"] = json!(0);
-                new_assignment["asn"] = json!(0);
-            } else {
-                new_pool[format!("{family}_prefix_len")] = json!(0);
-                new_assignment[format!("{family}_prefix_len")] = json!(0);
-            }
-            assert_ne!(
-                request(&app, "POST", &pools_path, new_pool, Some(&token))
-                    .await
-                    .0,
-                200
-            );
-            assert_ne!(
-                request(
-                    &app,
-                    "POST",
-                    &assignments_path,
-                    new_assignment,
-                    Some(&token)
-                )
-                .await
-                .0,
-                200
-            );
-            let (_, body) =
-                request(&app, "GET", &assignments_path, Value::Null, Some(&token)).await;
-            assert_eq!(
-                body[format!("{family}_assignments")]
-                    .as_array()
-                    .unwrap()
-                    .len(),
-                1
-            );
-        }
+            .await
+            .0,
+            400
+        );
+        let (_, targets) = request(
+            &app,
+            "GET",
+            &format!("/assignment/{conflict}/move-targets"),
+            Value::Null,
+            Some(&token),
+        )
+        .await;
+        assert!(!targets["assignments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["id"] == root_b));
+        // Promotion to root permits overlap and retains every descendant.
+        assert_eq!(
+            request(
+                &app,
+                "POST",
+                &move_url,
+                json!({"parent_id":null}),
+                Some(&token)
+            )
+            .await
+            .0,
+            200
+        );
+        let (_, ancestors) = request(
+            &app,
+            "GET",
+            &format!("/assignment/{leaf}/ancestors"),
+            Value::Null,
+            Some(&token),
+        )
+        .await;
+        assert_eq!(ancestors["assignments"].as_array().unwrap().len(), 1);
+        // No-op moves are allowed.
+        assert_eq!(
+            request(
+                &app,
+                "POST",
+                &move_url,
+                json!({"parent_id":null}),
+                Some(&token)
+            )
+            .await
+            .0,
+            200
+        );
     }
 }
 
 #[tokio::test]
-async fn malformed_authorization_is_handled_without_panicking() {
-    let (app, _) = app();
-    for (path, expected) in [("/ipv4/assignment_space", 200), ("/user/self", 401)] {
-        let req = Request::builder()
+async fn moves_reject_outside_ranges_and_other_resource_types_and_inherit_privacy() {
+    let (app, token, _) = app();
+    let asn = create(&app, &token, assignment("asn")).await;
+    let mut narrow = assignment("asn");
+    narrow["asn_to"] = json!(65050);
+    let narrow = create(&app, &token, narrow).await;
+    let ipv4 = create(&app, &token, assignment("ipv4")).await;
+    for parent in [narrow, ipv4] {
+        assert_eq!(
+            request(
+                &app,
+                "POST",
+                &format!("/assignment/{asn}/move"),
+                json!({"parent_id":parent}),
+                Some(&token)
+            )
+            .await
+            .0,
+            400
+        );
+    }
+    let mut private = assignment("asn");
+    private["visibility"] = json!("private");
+    let private = create(&app, &token, private).await;
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            &format!("/assignment/{asn}/move"),
+            json!({"parent_id":private}),
+            Some(&token)
+        )
+        .await
+        .0,
+        200
+    );
+    assert_eq!(
+        request(
+            &app,
+            "GET",
+            &format!("/assignment/{asn}"),
+            Value::Null,
+            None
+        )
+        .await
+        .0,
+        404
+    );
+}
+
+#[tokio::test]
+async fn malformed_headers_invalid_ranges_and_missing_objects_are_safe() {
+    let (app, token, _) = app();
+    for (path, status) in [("/assignment", 200), ("/user/self", 401)] {
+        let request = Request::builder()
             .uri(path)
             .header(
                 AUTHORIZATION,
@@ -273,207 +502,166 @@ async fn malformed_authorization_is_handled_without_panicking() {
             )
             .body(Body::empty())
             .unwrap();
-        assert_eq!(
-            app.clone().oneshot(req).await.unwrap().status().as_u16(),
-            expected
-        );
+        assert_eq!(app.clone().oneshot(request).await.unwrap().status(), status);
     }
-}
-
-#[tokio::test]
-async fn invalid_prefixes_are_rejected_before_allocation_work() {
-    let (app, token) = app();
+    assert_eq!(
+        request(&app, "POST", "/assignment", assignment("asn"), None)
+            .await
+            .0,
+        401
+    );
     for (family, max_len) in [("ipv4", 32), ("ipv6", 128)] {
-        let root = format!("/{family}/assignment_space");
-        let prefix = format!("{family}_prefix");
-        let length = format!("{family}_prefix_len");
-        for (object, get_path, create_path) in [
-            ("assignment_space", format!("{root}/1"), root.clone()),
-            (
-                "assignment_pool",
-                format!("{root}/1/pool/1"),
-                format!("{root}/1/pool"),
-            ),
-            (
-                "assignment",
-                format!("{root}/1/pool/1/assignment/1"),
-                format!("{root}/1/pool/1/assignment"),
-            ),
-        ] {
-            let (_, body) = request(&app, "GET", &get_path, Value::Null, Some(&token)).await;
-            let original = body[format!("{family}_{object}")].clone();
-            for invalid_len in [-1, max_len + 1, 100_000, i32::MAX] {
-                let mut invalid = original.clone();
-                invalid[&length] = json!(invalid_len);
-                let (status, body) =
-                    request(&app, "POST", &create_path, invalid, Some(&token)).await;
-                assert_eq!(status, 400, "{family} {object} /{invalid_len}: {body}");
-            }
-            let mut invalid = original.clone();
-            // Host bits are invalid for a prefix shorter than the address width.
-            invalid[&length] = json!(max_len - 1);
-            let last = invalid[&prefix].as_array().unwrap().len() - 1;
-            invalid[&prefix][last] = json!(1);
+        for len in [-1, max_len + 1, 100_000, i32::MAX] {
+            let mut value = assignment(family);
+            value[format!("{family}_prefix_len")] = json!(len);
             assert_eq!(
-                request(&app, "POST", &create_path, invalid, Some(&token))
+                request(&app, "POST", "/assignment", value, Some(&token))
                     .await
                     .0,
                 400
             );
         }
-        // Both /0 and single-address spaces are valid; spaces can still overlap.
-        let (_, body) = request(&app, "GET", &format!("{root}/1"), Value::Null, Some(&token)).await;
-        let mut space = body[format!("{family}_assignment_space")].clone();
-        space[&prefix] = json!(vec![0; if family == "ipv4" { 4 } else { 16 }]);
-        for valid_len in [0, max_len] {
-            space[&length] = json!(valid_len);
-            assert_eq!(
-                request(&app, "POST", &root, space.clone(), Some(&token))
-                    .await
-                    .0,
-                200
-            );
-        }
-    }
-}
-
-#[tokio::test]
-async fn enclosing_asn_pools_are_rejected() {
-    let (app, token) = app();
-    let space = json!({"name":"ASN range", "description":"", "space_visibility":"public", "asn_from":64000, "asn_to":65500});
-    let (_, body) = request(&app, "POST", "/asn/assignment_space", space, Some(&token)).await;
-    let space_id = body["asn_assignment_space"]["id"].as_i64().unwrap();
-    let path = format!("/asn/assignment_space/{space_id}/pool");
-    let mut pool = json!({"name":"Pool", "description":"", "pool_visibility":"public", "assignment_space_id":space_id, "asn_from":65000, "asn_to":65099});
-    assert_eq!(
-        request(&app, "POST", &path, pool.clone(), Some(&token))
-            .await
-            .0,
-        200
-    );
-    for (from, to) in [(64999, 65100), (65020, 65030), (65099, 65100)] {
-        pool["asn_from"] = json!(from);
-        pool["asn_to"] = json!(to);
+        let mut host_bits = assignment(family);
+        let last = if family == "ipv4" { 3 } else { 15 };
+        host_bits[format!("{family}_prefix")][last] = json!(1);
         assert_eq!(
-            request(&app, "POST", &path, pool.clone(), Some(&token))
+            request(&app, "POST", "/assignment", host_bits, Some(&token))
                 .await
                 .0,
             400
         );
     }
-    pool["asn_from"] = json!(65100);
-    pool["asn_to"] = json!(65199);
+    let mut invalid = assignment("asn");
+    invalid["asn_from"] = json!(65200);
     assert_eq!(
-        request(&app, "POST", &path, pool, Some(&token)).await.0,
-        200
+        request(&app, "POST", "/assignment", invalid, Some(&token))
+            .await
+            .0,
+        400
     );
+    for method in ["GET", "PUT", "DELETE"] {
+        assert_eq!(
+            request(
+                &app,
+                method,
+                "/assignment/9999",
+                json!({"name":"", "description":""}),
+                Some(&token)
+            )
+            .await
+            .0,
+            404
+        );
+    }
 }
 
 #[tokio::test]
-async fn nested_routes_enforce_all_parent_ids_without_mutating_objects() {
-    let (app, token) = app();
-    for family in ["asn", "ipv4", "ipv6"] {
-        let root = format!("/{family}/assignment_space");
-        let pool_path = format!("{root}/1/pool/1");
-        let assignment_path = format!("{pool_path}/assignment/1");
-        let (_, original_pool) = request(&app, "GET", &pool_path, Value::Null, Some(&token)).await;
-        let (_, original_assignment) =
-            request(&app, "GET", &assignment_path, Value::Null, Some(&token)).await;
-        let (_, space) =
-            request(&app, "GET", &format!("{root}/1"), Value::Null, Some(&token)).await;
-        let (_, created) = request(
+async fn deleting_a_deep_subtree_keeps_other_roots_and_children() {
+    let (app, token, store) = app();
+    let root = create(&app, &token, assignment("asn")).await;
+    let other = create(&app, &token, assignment("asn")).await;
+    let mut node = store.assignments().get_assignment(root as i32).unwrap();
+    let mut ids = vec![root];
+    // More than SQLite's cascading-trigger recursion limit.
+    for _ in 0..1100 {
+        node.parent_id = Some(*ids.last().unwrap() as i32);
+        ids.push(store.assignments().create_assignment(&node).unwrap() as i64);
+    }
+    assert_eq!(
+        store
+            .assignments()
+            .get_ancestors(*ids.last().unwrap() as i32)
+            .unwrap()
+            .len(),
+        1100
+    );
+    assert!(store
+        .assignments()
+        .is_public(*ids.last().unwrap() as i32)
+        .unwrap());
+    assert_eq!(
+        request(
             &app,
-            "POST",
-            &root,
-            space[format!("{family}_assignment_space")].clone(),
+            "DELETE",
+            &format!("/assignment/{root}"),
+            Value::Null,
+            None
+        )
+        .await
+        .0,
+        401
+    );
+    assert_eq!(
+        request(
+            &app,
+            "DELETE",
+            &format!("/assignment/{root}"),
+            Value::Null,
+            Some(&token)
+        )
+        .await
+        .0,
+        200
+    );
+    assert!(store
+        .assignments()
+        .get_assignment(*ids.last().unwrap() as i32)
+        .is_err());
+    assert!(store.assignments().get_assignment(other as i32).is_ok());
+}
+
+#[tokio::test]
+async fn adjacent_siblings_are_allowed_but_contained_and_enclosing_ranges_overlap() {
+    let (app, token, _) = app();
+    for family in ["asn", "ipv4", "ipv6"] {
+        let root = create(&app, &token, assignment(family)).await;
+        let mut left = assignment(family);
+        left["parent_id"] = json!(root);
+        let mut right = left.clone();
+        let mut enclosing = left.clone();
+        let mut contained = left.clone();
+        match family {
+            "asn" => {
+                left["asn_to"] = json!(65049);
+                right["asn_from"] = json!(65050);
+                right["asn_to"] = json!(65099);
+                enclosing["asn_to"] = json!(65100);
+                contained["asn_from"] = json!(65010);
+                contained["asn_to"] = json!(65020);
+            }
+            "ipv4" => {
+                left["ipv4_prefix_len"] = json!(25);
+                right["ipv4_prefix"] = json!([192, 168, 0, 128]);
+                right["ipv4_prefix_len"] = json!(25);
+                enclosing["ipv4_prefix_len"] = json!(24);
+                contained["ipv4_prefix_len"] = json!(26);
+            }
+            _ => {
+                left["ipv6_prefix_len"] = json!(65);
+                right["ipv6_prefix"][8] = json!(128);
+                right["ipv6_prefix_len"] = json!(65);
+                enclosing["ipv6_prefix_len"] = json!(64);
+                contained["ipv6_prefix_len"] = json!(66);
+            }
+        }
+        create(&app, &token, left).await;
+        create(&app, &token, right).await;
+        for overlap in [enclosing, contained] {
+            assert_eq!(
+                request(&app, "POST", "/assignment", overlap, Some(&token))
+                    .await
+                    .0,
+                400
+            );
+        }
+        let (_, children) = request(
+            &app,
+            "GET",
+            &format!("/assignment?parent_id={root}"),
+            Value::Null,
             Some(&token),
         )
         .await;
-        let other_space = created[format!("{family}_assignment_space")]["id"]
-            .as_i64()
-            .unwrap();
-        for wrong_space in [other_space, 999] {
-            let wrong_pool_path = format!("{root}/{wrong_space}/pool/1");
-            let wrong_assignment_path = format!("{wrong_pool_path}/assignment/1");
-            for path in [&wrong_pool_path, &wrong_assignment_path] {
-                for method in ["GET", "PUT", "DELETE"] {
-                    let body =
-                        json!({"name":"Wrong parent", "description":"", "visibility":"private"});
-                    assert_eq!(
-                        request(&app, method, path, body, Some(&token)).await.0,
-                        404,
-                        "{method} {path}"
-                    );
-                }
-            }
-            assert_eq!(
-                request(
-                    &app,
-                    "GET",
-                    &format!("{wrong_pool_path}/assignment"),
-                    Value::Null,
-                    Some(&token)
-                )
-                .await
-                .0,
-                404
-            );
-            assert_eq!(
-                request(
-                    &app,
-                    "POST",
-                    &format!("{wrong_pool_path}/assignment"),
-                    original_assignment[format!("{family}_assignment")].clone(),
-                    Some(&token)
-                )
-                .await
-                .0,
-                404
-            );
-        }
-        for method in ["GET", "PUT", "DELETE"] {
-            let path = format!("{root}/1/pool/999/assignment/1");
-            let body = json!({"name":"Wrong pool", "description":"", "visibility":"private"});
-            assert_eq!(
-                request(&app, method, &path, body, Some(&token)).await.0,
-                404
-            );
-        }
-        assert_eq!(
-            request(&app, "GET", &pool_path, Value::Null, Some(&token))
-                .await
-                .1,
-            original_pool
-        );
-        assert_eq!(
-            request(&app, "GET", &assignment_path, Value::Null, Some(&token))
-                .await
-                .1,
-            original_assignment
-        );
-        // Correct paths still work for updates and cascading deletes.
-        let body = json!({"name":"Valid update", "description":"", "visibility":"public"});
-        assert_eq!(
-            request(&app, "PUT", &assignment_path, body.clone(), Some(&token))
-                .await
-                .0,
-            200
-        );
-        assert_eq!(
-            request(&app, "PUT", &pool_path, body, Some(&token)).await.0,
-            200
-        );
-        assert_eq!(
-            request(&app, "DELETE", &pool_path, Value::Null, Some(&token))
-                .await
-                .0,
-            200
-        );
-        assert_eq!(
-            request(&app, "GET", &assignment_path, Value::Null, Some(&token))
-                .await
-                .0,
-            404
-        );
+        assert_eq!(children["assignments"].as_array().unwrap().len(), 2);
     }
 }

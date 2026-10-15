@@ -31,13 +31,15 @@ pub fn Drawer(props: DrawerProps) -> Element {
     let drawer_open = use_context::<Signal<DrawerState>>();
     let nav = use_context::<Navigator>();
 
-    let class = if drawer_open().open { "drawer drawer-open" } else { "drawer" };
+    let class = if drawer_open().open {
+        "drawer drawer-open"
+    } else {
+        "drawer"
+    };
 
-    let version_future = use_resource(|| {
-        async {
-            let res: Result<VersionResponse, _> = crate::fetch::get("/api/v1/version", None).await;
-            res
-        }
+    let version_future = use_resource(|| async {
+        let res: Result<VersionResponse, _> = crate::fetch::get("/api/v1/version", None).await;
+        res
     });
 
     let version = match &*version_future.read_unchecked() {
@@ -67,19 +69,19 @@ pub fn Drawer(props: DrawerProps) -> Element {
                 }
                 Link {
                     class: "link-button",
-                    to: Route::AsnSpaceList {},
+                    to: Route::AsnAssignments {},
                     onclick: move |_| { crate::close_drawer(); },
                     "ASN Assignments",
                 }
                 Link {
                     class: "link-button",
-                    to: Route::Ipv4SpaceList {},
+                    to: Route::Ipv4Assignments {},
                     onclick: move |_| { crate::close_drawer(); },
                     "IPv4 Assignments",
                 }
                 Link {
                     class: "link-button",
-                    to: Route::Ipv6SpaceList {},
+                    to: Route::Ipv6Assignments {},
                     onclick: move |_| { crate::close_drawer(); },
                     "IPv6 Assignments",
                 }
@@ -176,7 +178,13 @@ pub struct MetadataUpdateRequest {
 }
 
 #[component]
-pub fn MetadataForm(name: String, description: String, visibility: crate::inet::ObjectVisibility, error: Option<String>, onsubmit: EventHandler<MetadataUpdateRequest>) -> Element {
+pub fn MetadataForm(
+    name: String,
+    description: String,
+    visibility: crate::inet::ObjectVisibility,
+    error: Option<String>,
+    onsubmit: EventHandler<MetadataUpdateRequest>,
+) -> Element {
     let mut name = use_signal(|| name.clone());
     let mut description = use_signal(|| description.clone());
     let mut visibility = use_signal(|| visibility);
@@ -199,7 +207,7 @@ pub fn MetadataForm(name: String, description: String, visibility: crate::inet::
                 readonly: !signed_in,
             }
             label {
-                class: "text-input",
+                class: "select-label",
                 "Visibility",
                 select {
                     value: visibility().to_string(),
